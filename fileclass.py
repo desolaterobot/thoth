@@ -58,17 +58,20 @@ class Directory:
         totalFileCount = 0
         totalDirCount = 0
         #setting the contents list.
-        for item in os.listdir(self.path):
-            fileAddr = joinAddr(self.path, item)
-            if not isAllowed(fileAddr):
-                continue #ignore if given fileaddr is not allowed
-            if isFile(fileAddr):
-                self.contents.append(File(self.path, item))
-                totalFileCount+=1
-            else:
-                addeddir = Directory(self.path, item)
-                self.contents.append(addeddir)
-                totalDirCount+=1
+        try:
+            for item in os.listdir(self.path):
+                fileAddr = joinAddr(self.path, item)
+                if not isAllowed(fileAddr):
+                    continue #ignore if given fileaddr is not allowed
+                if isFile(fileAddr):
+                    self.contents.append(File(self.path, item))
+                    totalFileCount+=1
+                else:
+                    addeddir = Directory(self.path, item)
+                    self.contents.append(addeddir)
+                    totalDirCount+=1
+        except:
+            print(f"Unable to access folder with path: {self.path}")
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount
 
@@ -177,7 +180,7 @@ class Directory:
             os.remove(joinAddr(self.path, f"{self.name}.ththscrpt"))
 
 #converts a string path to a Directory class
-def path2Dir(path:str)->Directory:
+def path2Dir(path:str):
     p = path.split(sep='\\')
     name = p[-1]
     parentPath = path.removesuffix('\\' + name)

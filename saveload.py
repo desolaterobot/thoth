@@ -2,7 +2,7 @@
 
 import os
 
-globalDir = os.path.expanduser("~")+"/AppData/Local/Thoth"
+globalDir = os.path.expanduser("~")+"\AppData\Local\Thoth"
 
 #first time setup, create the directory and all the things in it, if havent.
 try:
@@ -10,7 +10,7 @@ try:
     empty = {
         "forbidden" : ['.ini', '.ththscrpt', '.git']
     }
-    open(globalDir + "/" + "data.ththscrpt", "w").write(str(empty))
+    open(globalDir + "\\" + "data.ththscrpt", "w").write(str(empty))
 except:
     pass
 

@@ -5,6 +5,7 @@ from tkinter import filedialog
 from fileclass import *
 import sys
 from tkinter import messagebox
+import time
 
 #GLOBAL VARIABLES######################################################################################
 
@@ -15,21 +16,15 @@ globalCurrentDirectoryObject:Directory = None
 
 #FUNCTIONS#############################################################################################
 
-def onHoverDeleteButton(event, isShowing:bool):
-    if isShowing:
-        print(f"delete {globalCurrentlySelectedPath}?")
-    else:
-        print("left delete button")
-
 def showRightFrame(isNormal):
+    rightFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
     if isNormal:
-        normalFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
+        normalButtonFrame.pack()
     else:
-        encryptedFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
+        encrButtonFrame.pack()
 
 def hideRightFrame():
-    normalFrame.grid_forget()
-    encryptedFrame.grid_forget()
+    rightFrame.grid_forget()
 
 def showListBox(listbox:tk.Listbox, items:list):
     listbox.delete(0, 'end')
@@ -47,9 +42,9 @@ def changeStatusLabel(directory:Directory):
     completefilecount = len(directory.getCompleteFilePathList())
     statusLabel.config(text=f'{name} has {filecount} files, {dircount} subfolders. Including subfolders, {completefilecount} files with total size {size}')
     showRightFrame(True)
-    deleteFileButton1.config(state='disabled')
-    deleteFileButton2.config(state='disabled')
+    deleteFileButton.config(state='disabled')
 
+#function is RECURSIVE! 
 def showDirectory(e, directory:str, nestvalue:int=0):
     targetDirectory = path2Dir(directory)
     fileCount = 0
@@ -71,16 +66,32 @@ def showDirectory(e, directory:str, nestvalue:int=0):
     return targetDirectory
 
 def showStatus(directory):
+    lookInFolderButton.config(state='disabled')
+    renameButton.config(state='disabled')
+    deleteFileButton.config(state='disabled')
+    dirBox.delete(0, tk.END)
+    dirBox.insert(0, directory)
     statusLabel.config(text=f'Searching {directory}...')
+    time.sleep(0.1)
+    startTime = time.time()
+    changeStatusLabel(showDirectory(None, directory))
+    endTime = time.time()
+    statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):2f} seconds.')
     return
 
+#show the selected directory again, referring to the textbox instead of the directory finder
 def refreshListBox(e, directory:str):
-    globalTitlePathDict.clear()
-    showListBox(dirlistbox, [])
-    #check if directory is empty
+    #check if the folder is the C drive itself or directly nested in the C: drive or C:\Users\name.
+    #I assume there are more 'crucial' folders but this should be enough, I put full trust in the user to encrypt responsibly
+    if directory.endswith(':') or directory == os.path.expanduser("~") or len(directory.split('\\')) == 2:
+        if not messagebox.askyesno(f"Dangerous folder", f"Thoth does not reccommend encrypting or even looking into {directory} due to its size and importance. Look into it anyway?"):
+            return
     if directory == "":
         hideRightFrame()
         return
+    globalTitlePathDict.clear()
+    showListBox(dirlistbox, [])
+    #check if directory is empty
     #check if given directory exists
     if not os.path.exists(directory):
         hideRightFrame()
@@ -88,23 +99,22 @@ def refreshListBox(e, directory:str):
         messagebox.showerror(title='Does not exist', message=f'Folder "{directory}" does not exist. Did you type it correctly?')
         return
     showStatus(directory)
-    changeStatusLabel(showDirectory(None, directory))
 
+#open the directory finder and show the selected directory onto the list box
 def searchDirectory():
     globalTitlePathDict.clear()
     filepath = filedialog.askdirectory(title='select directory')
     showListBox(dirlistbox, [])
     print(filepath)
     if filepath == '':
+        hideRightFrame()
         return
     filepath = filepath.replace('/', '\\')
     showStatus(filepath)
-    dirBox.delete(0, tk.END)  
-    dirBox.insert(0, filepath) 
-    changeStatusLabel(showDirectory(None, filepath))
 
+#delete currently selected path/file
 def deleteSelectedFile():
-    if messagebox.askyesno(title='Confirm deletion', message=f'Are you sure you want to permanently delete {globalCurrentlySelectedPath}'):
+    if messagebox.askyesno(title='Confirm deletion', message=f'Are you sure you want to permanently delete {globalCurrentlySelectedPath}?'):
         from shutil import rmtree
         if isFile(globalCurrentlySelectedPath):
             os.remove(globalCurrentlySelectedPath)
@@ -115,16 +125,46 @@ def deleteSelectedFile():
                 messagebox.showerror(title='Permission error', message=f'Unable to access {globalCurrentlySelectedPath}')
         refreshListBox(None, globalCurrentDirectoryObject.path)
 
+#changing of target directory to the currently selected path
 def lookInFolder():
     dirBox.delete(0, tk.END)
     dirBox.insert(0, globalCurrentlySelectedPath)
     refreshListBox(None, globalCurrentlySelectedPath)
 
-def startEncryption():
-    if not messagebox.askokcancel(title='Confirm encryption', message=f'You are about to encrypt the folder {globalCurrentDirectoryObject.path}. Proceed?'):
+#binded to the button that says "Encrypt folder"
+def startModification(isEncrypting:bool):
+    global globalCurrentDirectoryObject
+    if passBox.get() == "":
+        messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
+        return 
+    if not messagebox.askokcancel(title=f"Confirm {'encryption' if isEncrypting else 'decryption'}", message=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder {globalCurrentDirectoryObject.path} with the given passcode. Proceed?"):
         return
-    
+    #encryption steps: modification, update current directory, update the list box.
+    key = generateKey(passBox.get())
+    currentDirectory = globalCurrentDirectoryObject.path
+    globalCurrentDirectoryObject.modifyDirectory(isEncrypting, key) #modification
+    globalCurrentDirectoryObject = path2Dir(currentDirectory) #upodating current directory
+    refreshListBox(None, currentDirectory) #update listbox
 
+#yet to be tested out 
+def renameCurrentFile():
+    def onSubmit():
+        newName = nameEntry.get()
+        newPath = globalCurrentlySelectedPath.replace(name, newName+extension)
+        renameWindow.destroy()
+        os.rename(globalCurrentlySelectedPath, newPath)
+        refreshListBox(None, newPath)
+    name = globalCurrentlySelectedPath.split('\\')[-1]
+    extension = os.path.splitext(name)
+    renameWindow = tk.Toplevel(root)
+    renameWindow.title("Rename file/folder")
+    label = tk.Label(renameWindow, text=f"Enter the new name for {name}. File extension added automatically.")
+    label.pack(pady=20)
+    nameEntry = tk.Entry(renameWindow, width=10)
+    nameEntry.pack(pady=20)
+    okButton = tk.Button(renameWindow, text='Rename', font=('Arial', 10), command=onSubmit)
+    okButton.pack(pady=20)
+    
 #GUI######################################################################################
 
 root = tk.Tk()
@@ -172,13 +212,11 @@ def fileSelected(event):
         global globalCurrentlySelectedPath
         globalCurrentlySelectedPath = globalTitlePathDict[dirlistbox.get(index)]
         if not isFile(globalCurrentlySelectedPath):
-            lookInFolderButton2.config(state='normal')
-            lookInFolderButton1.config(state='normal')
+            lookInFolderButton.config(state='normal')
         else:
-            lookInFolderButton2.config(state='disabled')
-            lookInFolderButton1.config(state='disabled')
-        deleteFileButton2.config(state='normal')
-        deleteFileButton1.config(state='normal')
+            lookInFolderButton.config(state='disabled')
+        deleteFileButton.config(state='normal')
+        renameButton.config(state='normal')
         print("Selected ", globalCurrentlySelectedPath)
 
 def startFile(event):
@@ -189,33 +227,47 @@ def startFile(event):
     selected_item = dirlistbox.get(index)
     os.system(f'start "" "{globalTitlePathDict[selected_item]}"')
 
+def gotoParentFolder():
+    dirBox.delete(0, tk.END)
+    lastUnit = globalCurrentDirectoryObject.path.split(sep='\\')[-1]
+    newPath = globalCurrentDirectoryObject.path.removesuffix('\\' + lastUnit)
+    dirBox.delete(0, tk.END)
+    dirBox.insert(0, newPath)
+    refreshListBox(None, newPath)
+    lookInFolderButton.config(state='disabled')
+
 dirlistbox.bind('<<ListboxSelect>>', fileSelected)
 dirlistbox.bind('<Double-Button-1>', startFile)
 
 statusLabel = tk.Label(leftFrame, text='No Folder Displayed.', font=('Arial', 13), bg=bgColor, fg=textColor)
 statusLabel.pack(pady=(0, 10))
+statusLabel2 = tk.Label(leftFrame, text='', font=('Arial', 13), bg=bgColor, fg=textColor)
+statusLabel2.pack(pady=(0, 10))
 
-#frame of buttons if target directory is encrypted. parent is root.
-encryptedFrame = tk.Frame(root, bg=normalBgColor, width=200, height=800)
-decryptFolderButton = tk.Button(encryptedFrame, text='Decrypt Folder', font=('Arial', 13))
-decryptFolderButton.pack(padx=15, pady=(15, 7))
-translateFolderButton = tk.Button(encryptedFrame, text='Translate Folder', font=('Arial', 13))
-translateFolderButton.pack(padx=15, pady=7)
-decryptSingleButton = tk.Button(encryptedFrame, text='Decrypt File and Open', font=('Arial', 13))
-decryptSingleButton.pack(padx=15, pady=7)
-lookInFolderButton1 = tk.Button(encryptedFrame, text='Look in Folder', font=('Arial', 13), command=lambda e: lookInFolder(e, globalCurrentlySelectedPath), state='disabled')
-lookInFolderButton1.pack(padx=15, pady=(15, 7))
-deleteFileButton1 = tk.Button(encryptedFrame, text='Delete', font=('Arial', 13), command=deleteSelectedFile, state='disabled', fg='red')
-deleteFileButton1.pack(padx=15, pady=7)
+#first, pack the buttons that will be in BOTH encrypted and decrypted mode.
+rightFrame = tk.Frame(root, bg=normalBgColor, width=200, height=800)
+parentFolderButton = tk.Button(rightFrame, text='Parent Folder', font=('Arial', 13), command=gotoParentFolder)
+parentFolderButton.pack(padx=15, pady=(14, 4))
+lookInFolderButton = tk.Button(rightFrame, text='Look in Folder', font=('Arial', 13), command=lookInFolder)
+lookInFolderButton.pack(padx=15, pady=(14, 4))
+renameButton = tk.Button(rightFrame, text='Rename', font=('Arial', 13), command=renameCurrentFile, state='disabled', fg='red')
+renameButton.pack(padx=7, pady=(14, 4))
+deleteFileButton = tk.Button(rightFrame, text='Delete', font=('Arial', 13), command=deleteSelectedFile, state='disabled', fg='red')
+deleteFileButton.pack(padx=7, pady=(14, 4))
 
-#frame of buttons if target directory is normal. parent is root.
-normalFrame = tk.Frame(root, bg=normalBgColor, width=200, height=800)
-encryptFolderButton = tk.Button(normalFrame, text='Encrypt Folder', font=('Arial', 13), command=startEncryption)
+#then, pack the exclusive buttons into seperate frames.
+#if folder is currently not encrypted (normal)
+normalButtonFrame = tk.Frame(rightFrame, bg=normalBgColor)
+encryptFolderButton = tk.Button(normalButtonFrame, text='Encrypt Folder', font=('Arial', 13), command=lambda: startModification(True))
 encryptFolderButton.pack(padx=15, pady=(14, 4))
-lookInFolderButton2 = tk.Button(normalFrame, text='Look in Folder', font=('Arial', 13), command=lookInFolder)
-lookInFolderButton2.pack(padx=15, pady=(14, 4))
-deleteFileButton2 = tk.Button(normalFrame, text='Delete', font=('Arial', 13), command=deleteSelectedFile, state='disabled', fg='red')
-deleteFileButton2.pack(padx=7, pady=(14, 4))
+#if folder is currently encrypted
+encrButtonFrame = tk.Frame(rightFrame, bg=normalBgColor)
+decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Arial', 13))
+decryptFolderButton.pack(padx=15, pady=(15, 7))
+translateFolderButton = tk.Button(encrButtonFrame, text='Translate Folder', font=('Arial', 13))
+translateFolderButton.pack(padx=15, pady=7)
+decryptSingleButton = tk.Button(encrButtonFrame, text='Decrypt File and Open', font=('Arial', 13))
+decryptSingleButton.pack(padx=15, pady=7)
 
 leftFrame.grid(column=0, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
 scrollbar.grid(column=1, row=0, sticky=tk.N+tk.S+tk.E+tk.W)

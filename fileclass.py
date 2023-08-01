@@ -193,8 +193,7 @@ if __name__ == "__main__":
 
     sampleDirec = path2Dir(inpl[0])
     sampleDirec.printContents()
-    m = 0
-    print()
-    for x in sampleDirec.getCompleteFilePathList():
-        m+=1
-        print(m, x)
+    
+    passw = input()
+    key = generateKey(passw)
+    sampleDirec.modifyDirectory(True, key)

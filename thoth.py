@@ -62,7 +62,7 @@ def showDirectory(e, directory:str, nestvalue:int=0):
             globalTitlePathDict[title] = item.path
         elif isinstance(item, Directory):
             dirCount += 1
-            title = f"{nestvalue * '    '}FOLDER {dirCount}/{targetDirectory.totalDirCount}: {item.name}"
+            title = f"{nestvalue * '    '}FOLDER {dirCount}/{targetDirectory.totalDirCount}: {item.name} - contains {item.totalFileCount} files, {item.totalDirCount} folders:" 
             appendListBox(dirlistbox, title)
             globalTitlePathDict[title] = item.path
             showDirectory(None, item.path, nestvalue + 1)

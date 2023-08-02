@@ -6,6 +6,9 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
 from hashlib import md5
+import tkinter as tk
+
+globalCurrentFileBeingModified = ""
 
 #generates a encryption key from a string seed
 def generateKey(seed:str):
@@ -30,6 +33,9 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
     if not isEncrypting:
         if not filePath.endswith(".thth"):
             return Exception('Not decryptable by Thoth')
+    
+    global globalCurrentFileBeingModified
+    globalCurrentFileBeingModified = filePath
         
     #read and encrypt the contents of the file
     with open(filePath, 'rb') as file:

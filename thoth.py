@@ -141,13 +141,24 @@ def lookInFolder():
     refreshListBox(None, globalCurrentlySelectedPath)
 
 #binded to the button that says "Encrypt folder"
+#TODO make a seperate modification window, then call the function there.
 def startModification(isEncrypting:bool):
+    def 
     global globalCurrentDirectoryObject
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
         return 
+    #delete this
     if not messagebox.askokcancel(title=f"Confirm {'encryption' if isEncrypting else 'decryption'}", message=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder {globalCurrentDirectoryObject.path} with the given passcode. Proceed?"):
         return
+    #modification window
+    modWindow = tk.Toplevel(root)
+    centerWindow(modWindow, 200, 100)
+    modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
+    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?")
+    textBox.pack(padx=10, pady=10)
+    encryptButton = tk.Button(rightFrame, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=)
+    encryptButton.pack(padx=15, pady=(14, 4))
     #encryption steps: modification, update current directory, update the list box.
     key = generateKey(passBox.get())
     currentDirectory = globalCurrentDirectoryObject.path
@@ -157,6 +168,7 @@ def startModification(isEncrypting:bool):
     #for the modification stage, find a way to 
     globalCurrentDirectoryObject = path2Dir(currentDirectory) #upodating current directory
     refreshListBox(None, currentDirectory) #update listbox
+    modWindow.destroy()
 
 #such a tedious process for something that is not really related to encryption
 def renameCurrentFile():

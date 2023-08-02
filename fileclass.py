@@ -13,7 +13,6 @@ colorama.init()
 # GLOBAL VARIABLES ############################################################################################################################
 
 globalCurrentModificationProgess = 0
-globalCurrentFileBeingEncrypted = None
 
 # FUNCTIONS ###################################################################################################################################
 
@@ -78,7 +77,7 @@ class Directory:
                     self.contents.append(addeddir)
                     totalDirCount+=1
         except:
-            print(f"Unable to access folder with path: {self.path}")
+            print(f"UNABLE TO ACCESS FOLDER WITH PATH: {self.path}")
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount
 
@@ -128,8 +127,9 @@ class Directory:
     #when encrypting, this function adds another file with extension .tthscrpt in that directory to store an md5 hash of the key used to encrypt it.
     #this is to check whether a key used to decrypt it in the future is the correct one or not.
     #in the same file, we also save the paths of the files that are successfully encrypted.
-    #also, every encrypted file will end with a .tth for standardization purposes
+    #also, every encrypted file will end with a .tth for standardization purposes, explained at cryption.py also
     #!comments related to implementing this naming scheme start with a '!' like this one.
+    #function returns a string if there are any errors, None if successful.
     def modifyDirectory(self, isEncrypting:bool, key:bytes, nestvalue:int=0):
         thothInfo = {
             "hash" : None,
@@ -141,26 +141,26 @@ class Directory:
             #!folders are considered encrypted ONLY when they contain the Thoth script.
             if os.path.exists(joinAddr(self.path, f"{self.name}.ththscrpt")):
                 print(f"Folder {self.name} already contains files encrypted by Thoth. To encrypt, decrypt everything in this folder first.")
-                return
+                return 'ALREADYENCRYPTED'
             #!write the md5 hash of the key into the thoth template
             thothInfo['hash'] = mdHash(key.decode())
         else:
             #!before we decrypt, check if thoth script exists in the given folder.
             if not os.path.exists(joinAddr(self.path, f"{self.name}.ththscrpt")):
                 print(f"Folder {self.name} has not been encrypted by Thoth. Not decryptable.")
-                return
+                return 'UNDECRYPTABLE'
             #!then, check if the given key is correct by checking if the md5 hash of the given key matches the hash in thoth script.
             givenHash = eval(open(joinAddr(self.path, f"{self.name}.ththscrpt"), "r").read())['hash']
             hashKey = mdHash(key.decode())
             if hashKey != givenHash:
                 print(f"Wrong key given for folder {self.name}")
-                return
+                return 'WRONGKEY'
 
         #we can now modify every single file.
         fileCount = 0
         dirCount = 0
         successCount = self.totalFileCount
-
+        
         for item in self.contents:
             if type(item) == File:
                 fileCount+=1
@@ -172,6 +172,7 @@ class Directory:
                     if isEncrypting:
                         #!append the encrypted paths into the thoth script during encryption process.
                         thothInfo['files'].append(path)
+                    global globalCurrentModificationProgess
                     globalCurrentModificationProgess += 1
                     print(f"{nestvalue * '    '}FILE {fileCount}/{self.totalFileCount}: {item.name} successfully modifed.")
             elif type(item) == Directory:

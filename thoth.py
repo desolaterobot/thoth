@@ -7,14 +7,22 @@ import sys
 from tkinter import messagebox
 import time
 
-#GLOBAL VARIABLES######################################################################################
+# GLOBAL VARIABLES ######################################################################################
 
 globalVersionNumber = '1.0'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
 
-#FUNCTIONS#############################################################################################
+# FUNCTIONS #############################################################################################
+
+def centerWindow(window, width, height):
+    # Get the screen width and height
+    screenW = window.winfo_screenwidth()
+    screenH = window.winfo_screenheight()
+    x = (screenW // 2) - (width // 2)
+    y = (screenH // 2) - (height // 2)
+    window.geometry(f"{width}x{height}+{x}+{y}")
 
 def showRightFrame(isNormal):
     rightFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
@@ -76,7 +84,8 @@ def showStatus(directory):
     startTime = time.time()
     changeStatusLabel(showDirectory(None, directory))
     endTime = time.time()
-    statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):2f} seconds.')
+    #apparently '.3g' is the 3sf specifier????
+    statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):.3g} seconds.')
     return
 
 #show the selected directory again, referring to the textbox instead of the directory finder
@@ -142,34 +151,56 @@ def startModification(isEncrypting:bool):
     #encryption steps: modification, update current directory, update the list box.
     key = generateKey(passBox.get())
     currentDirectory = globalCurrentDirectoryObject.path
+    global globalCurrentModificationProgess
+    globalCurrentModificationProgess = 0
     globalCurrentDirectoryObject.modifyDirectory(isEncrypting, key) #modification
+    #for the modification stage, find a way to 
     globalCurrentDirectoryObject = path2Dir(currentDirectory) #upodating current directory
     refreshListBox(None, currentDirectory) #update listbox
 
-#yet to be tested out 
+#such a tedious process for something that is not really related to encryption
 def renameCurrentFile():
-    def onSubmit():
+    def onSubmit(e=None):
+        #renaming
         newName = nameEntry.get()
+        if newName == "":
+            messagebox.showerror("Name not entered", "You cannot have a blank filename wtf")
+            return
         newPath = globalCurrentlySelectedPath.replace(name, newName+extension)
         renameWindow.destroy()
         os.rename(globalCurrentlySelectedPath, newPath)
-        refreshListBox(None, newPath)
+        selected = dirlistbox.curselection()
+        #changing the listbox
+        if not selected:
+            return
+        itemSelected:str = dirlistbox.get(selected[0])
+        newText = itemSelected.replace(name, newName+extension)
+        dirlistbox.delete(selected[0])
+        dirlistbox.insert(selected[0], newText)
+        #change the key-value pair in the globalDictionary
+        globalTitlePathDict[newText] = globalTitlePathDict.pop(itemSelected)
+        globalTitlePathDict[newText] = newPath
     name = globalCurrentlySelectedPath.split('\\')[-1]
-    extension = os.path.splitext(name)
+    extension = os.path.splitext(name)[1]
     renameWindow = tk.Toplevel(root)
+    centerWindow(renameWindow, 300, 120)
     renameWindow.title("Rename file/folder")
-    label = tk.Label(renameWindow, text=f"Enter the new name for {name}. File extension added automatically.")
-    label.pack(pady=20)
-    nameEntry = tk.Entry(renameWindow, width=10)
-    nameEntry.pack(pady=20)
+    label = tk.Label(renameWindow, text=f"Enter the new name for {name}.\nFile extension added automatically.")
+    label.pack(pady=5, padx=10)
+    nameEntry = tk.Entry(renameWindow, width=40, bg='#bababa')
+    nameEntry.pack(pady=5, padx=10)
+    nameEntry.focus_set()
+    nameEntry.bind()
+    nameEntry.bind("<Return>", onSubmit)
     okButton = tk.Button(renameWindow, text='Rename', font=('Arial', 10), command=onSubmit)
-    okButton.pack(pady=20)
+    okButton.pack(pady=5)
     
 #GUI######################################################################################
 
 root = tk.Tk()
 root.title(f"Thoth {globalVersionNumber}")
 root.resizable(False, False)
+#centerWindow(root, 840, 600)
 
 bgColor = '#02262b'
 normalBgColor = '#02191c'
@@ -250,17 +281,17 @@ parentFolderButton = tk.Button(rightFrame, text='Parent Folder', font=('Arial', 
 parentFolderButton.pack(padx=15, pady=(14, 4))
 lookInFolderButton = tk.Button(rightFrame, text='Look in Folder', font=('Arial', 13), command=lookInFolder)
 lookInFolderButton.pack(padx=15, pady=(14, 4))
-renameButton = tk.Button(rightFrame, text='Rename', font=('Arial', 13), command=renameCurrentFile, state='disabled', fg='red')
-renameButton.pack(padx=7, pady=(14, 4))
 deleteFileButton = tk.Button(rightFrame, text='Delete', font=('Arial', 13), command=deleteSelectedFile, state='disabled', fg='red')
 deleteFileButton.pack(padx=7, pady=(14, 4))
 
 #then, pack the exclusive buttons into seperate frames.
-#if folder is currently not encrypted (normal)
+#when folder is normal, display normalButtonFrame
 normalButtonFrame = tk.Frame(rightFrame, bg=normalBgColor)
+renameButton = tk.Button(normalButtonFrame, text='Rename', font=('Arial', 13), command=renameCurrentFile, state='disabled')
+renameButton.pack(padx=7, pady=(14, 4))
 encryptFolderButton = tk.Button(normalButtonFrame, text='Encrypt Folder', font=('Arial', 13), command=lambda: startModification(True))
 encryptFolderButton.pack(padx=15, pady=(14, 4))
-#if folder is currently encrypted
+#when folder is encrypted, display encrButtonFrame
 encrButtonFrame = tk.Frame(rightFrame, bg=normalBgColor)
 decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Arial', 13))
 decryptFolderButton.pack(padx=15, pady=(15, 7))

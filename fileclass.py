@@ -10,6 +10,13 @@ from colorama import Fore, Style
 import colorama
 colorama.init()
 
+# GLOBAL VARIABLES ############################################################################################################################
+
+globalCurrentModificationProgess = 0
+globalCurrentFileBeingEncrypted = None
+
+# FUNCTIONS ###################################################################################################################################
+
 def joinAddr(string1, string2):
     return string1 + '\\' + string2
 
@@ -118,9 +125,11 @@ class Directory:
         print(f"{nestvalue * '    '}WITHIN {self.name}: {self.totalFileCount} FILES, {self.totalDirCount} FOLDERS - {sizeToString(self.getSize())}")
     
     #encrypt/decrypt every single file in a directory.
-    #when encrypting, this function adds another file in that directory to store an md5 hash of the key used to encrypt it.
+    #when encrypting, this function adds another file with extension .tthscrpt in that directory to store an md5 hash of the key used to encrypt it.
     #this is to check whether a key used to decrypt it in the future is the correct one or not.
     #in the same file, we also save the paths of the files that are successfully encrypted.
+    #also, every encrypted file will end with a .tth for standardization purposes
+    #!comments related to implementing this naming scheme start with a '!' like this one.
     def modifyDirectory(self, isEncrypting:bool, key:bytes, nestvalue:int=0):
         thothInfo = {
             "hash" : None,
@@ -163,6 +172,7 @@ class Directory:
                     if isEncrypting:
                         #!append the encrypted paths into the thoth script during encryption process.
                         thothInfo['files'].append(path)
+                    globalCurrentModificationProgess += 1
                     print(f"{nestvalue * '    '}FILE {fileCount}/{self.totalFileCount}: {item.name} successfully modifed.")
             elif type(item) == Directory:
                 dirCount+=1
@@ -179,7 +189,7 @@ class Directory:
             #!after decryption... we remove the thoth script file entirely, to show that the folder is normal.
             os.remove(joinAddr(self.path, f"{self.name}.ththscrpt"))
 
-#converts a string path to a Directory class
+#converts a string path to a Directory object
 def path2Dir(path:str):
     p = path.split(sep='\\')
     name = p[-1]

@@ -27,8 +27,10 @@ def centerWindow(window, width, height):
 def showRightFrame(isNormal):
     rightFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
     if isNormal:
+        encrButtonFrame.pack_forget()
         normalButtonFrame.pack()
     else:
+        normalButtonFrame.pack_forget()
         encrButtonFrame.pack()
 
 def hideRightFrame():
@@ -49,7 +51,7 @@ def changeStatusLabel(directory:Directory):
     filecount = directory.totalFileCount
     completefilecount = len(directory.getCompleteFilePathList())
     statusLabel.config(text=f'{name} has {filecount} files, {dircount} subfolders. Including subfolders, {completefilecount} files with total size {size}')
-    showRightFrame(True)
+    showRightFrame(not directory.isEncrypted)
     deleteFileButton.config(state='disabled')
 
 #function is RECURSIVE! 
@@ -86,6 +88,11 @@ def showStatus(directory):
     endTime = time.time()
     #apparently '.3g' is the 3sf specifier????
     statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):.3g} seconds.')
+    #change listbox color based on if file is encrypted or not.
+    if globalCurrentDirectoryObject.isEncrypted:
+        dirlistbox.config(bg='#1b0f45', fg='#03fcfc')
+    else:
+        dirlistbox.config(bg=listBoxColor, fg='white')
     return
 
 #show the selected directory again, referring to the textbox instead of the directory finder
@@ -141,36 +148,39 @@ def lookInFolder():
     refreshListBox(None, globalCurrentlySelectedPath)
 
 #binded to the button that says "Encrypt folder"
-#TODO make a seperate modification window, then call the function there.
 def startModification(isEncrypting:bool):
-    def 
+    def start():
+        modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
+        encryptButton.pack_forget()
+        #TODO somehow, this line cannot be seen during encryption. i am completely baffled
+        textBox.config(text='\nDo not close this window.\nTime taken may vary depending\non file size and storage type.')
+        #encryption steps: modification, update current directory, update the list box.
+        key = generateKey(passBox.get())
+        global globalCurrentDirectoryObject
+        currentDirectory = globalCurrentDirectoryObject.path
+        startTime = time.time()
+        globalCurrentDirectoryObject.modifyDirectory(isEncrypting, key) # modification process
+        endTime = time.time()
+        #TODO for the modification stage, find a way to log the progress of the modification. there doesn't seem to be a way 
+        globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
+        refreshListBox(None, currentDirectory) #update listbox
+        statusLabel2.config(text=f"Time taken to {'encrypt' if isEncrypting else 'decrypt'} target directory: {(endTime-startTime):.3g} seconds.")
+        modWindow.destroy()
     global globalCurrentDirectoryObject
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
         return 
-    #delete this
-    if not messagebox.askokcancel(title=f"Confirm {'encryption' if isEncrypting else 'decryption'}", message=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder {globalCurrentDirectoryObject.path} with the given passcode. Proceed?"):
-        return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 200, 100)
-    modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
-    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?")
-    textBox.pack(padx=10, pady=10)
-    encryptButton = tk.Button(rightFrame, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=)
-    encryptButton.pack(padx=15, pady=(14, 4))
-    #encryption steps: modification, update current directory, update the list box.
-    key = generateKey(passBox.get())
-    currentDirectory = globalCurrentDirectoryObject.path
-    global globalCurrentModificationProgess
-    globalCurrentModificationProgess = 0
-    globalCurrentDirectoryObject.modifyDirectory(isEncrypting, key) #modification
-    #for the modification stage, find a way to 
-    globalCurrentDirectoryObject = path2Dir(currentDirectory) #upodating current directory
-    refreshListBox(None, currentDirectory) #update listbox
-    modWindow.destroy()
+    centerWindow(modWindow, 350, 130)
+    modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
+    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Arial', 12))
+    textBox.pack(padx=5, pady=(8, 8))
+    encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
+    encryptButton.pack(padx=5, pady=(8, 2))
+    encryptButton.focus()
 
-#such a tedious process for something that is not really related to encryption
+#such a tedious function for something that is not really related to encryption
 def renameCurrentFile():
     def onSubmit(e=None):
         #renaming
@@ -305,7 +315,7 @@ encryptFolderButton = tk.Button(normalButtonFrame, text='Encrypt Folder', font=(
 encryptFolderButton.pack(padx=15, pady=(14, 4))
 #when folder is encrypted, display encrButtonFrame
 encrButtonFrame = tk.Frame(rightFrame, bg=normalBgColor)
-decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Arial', 13))
+decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Arial', 13), command=lambda: startModification(False))
 decryptFolderButton.pack(padx=15, pady=(15, 7))
 translateFolderButton = tk.Button(encrButtonFrame, text='Translate Folder', font=('Arial', 13))
 translateFolderButton.pack(padx=15, pady=7)

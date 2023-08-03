@@ -12,7 +12,7 @@ colorama.init()
 
 # GLOBAL VARIABLES ############################################################################################################################
 
-globalCurrentModificationProgess = 0
+# none yet?
 
 # FUNCTIONS ###################################################################################################################################
 
@@ -61,12 +61,17 @@ class Directory:
         self.name = itemName;
         self.path = joinAddr(parent, itemName)
         self.contents = []
+        #status = 0: unencrypted file, status = 1: encrypted file
+        self.isEncrypted = False
         totalFileCount = 0
         totalDirCount = 0
         #setting the contents list.
         try:
             for item in os.listdir(self.path):
                 fileAddr = joinAddr(self.path, item)
+                #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
+                if fileAddr.endswith('.ththscrpt'):
+                    self.isEncrypted = True
                 if not isAllowed(fileAddr):
                     continue #ignore if given fileaddr is not allowed
                 if isFile(fileAddr):
@@ -172,8 +177,6 @@ class Directory:
                     if isEncrypting:
                         #!append the encrypted paths into the thoth script during encryption process.
                         thothInfo['files'].append(path)
-                    global globalCurrentModificationProgess
-                    globalCurrentModificationProgess += 1
                     print(f"{nestvalue * '    '}FILE {fileCount}/{self.totalFileCount}: {item.name} successfully modifed.")
             elif type(item) == Directory:
                 dirCount+=1

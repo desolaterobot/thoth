@@ -6,6 +6,7 @@ from fileclass import *
 import sys
 from tkinter import messagebox
 import time
+from cryptography import fernet
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -13,8 +14,33 @@ globalVersionNumber = '1.0'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
+globalIsTranslatedBoolean = False
 
 # FUNCTIONS #############################################################################################
+
+def checkPass():
+    #!check if the given key is correct by checking if the md5 hash of the given key matches the hash in thoth script.
+    givenHash = eval(open(joinAddr(globalCurrentDirectoryObject.path, f"{globalCurrentDirectoryObject.name}.ththscrpt"), "r").read())['hash']
+    key = generateKey(passBox.get())
+    hashKey = mdHash(key.decode())
+    if hashKey != givenHash:
+        messagebox.showerror('Wrong passcode', 'The passcode entered does not match the passcode used for the encryption of this folder.')
+        return False
+    return True
+
+def translateListBox():
+    if not globalCurrentDirectoryObject.isEncrypted:
+        return
+    for title,path in globalTitlePathDict:
+        path:str
+        title:str
+        #changing the global dictionary
+        if isFile(path):
+            encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
+            decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+            newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
+            globalTitlePathDict[newTitle] = path
+            del globalTitlePathDict[title]
 
 def centerWindow(window, width, height):
     # Get the screen width and height
@@ -170,11 +196,13 @@ def startModification(isEncrypting:bool):
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
         return 
+    if not checkPass():
+        return
     #modification window
     modWindow = tk.Toplevel(root)
     centerWindow(modWindow, 350, 130)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
-    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Arial', 12))
+    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Arial', 10))
     textBox.pack(padx=5, pady=(8, 8))
     encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
     encryptButton.pack(padx=5, pady=(8, 2))
@@ -224,8 +252,8 @@ root.title(f"Thoth {globalVersionNumber}")
 root.resizable(False, False)
 #centerWindow(root, 840, 600)
 
-bgColor = '#02262b'
-normalBgColor = '#02191c'
+bgColor = '#1c1c1c'
+normalBgColor = '#363636'
 listBoxColor = '#000e26'
 textColor = 'white'
 

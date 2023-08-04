@@ -61,7 +61,6 @@ class Directory:
         self.name = itemName;
         self.path = joinAddr(parent, itemName)
         self.contents = []
-        #status = 0: unencrypted file, status = 1: encrypted file
         self.isEncrypted = False
         totalFileCount = 0
         totalDirCount = 0
@@ -107,7 +106,7 @@ class Directory:
                     files.extend(recursed)
             return files    
         return fileList(self)
-    
+
     def getSize(self):
         totalSize = 0
         for itemPath in self.getCompleteFilePathList():
@@ -154,12 +153,14 @@ class Directory:
             if not os.path.exists(joinAddr(self.path, f"{self.name}.ththscrpt")):
                 print(f"Folder {self.name} has not been encrypted by Thoth. Not decryptable.")
                 return 'UNDECRYPTABLE'
-            #!then, check if the given key is correct by checking if the md5 hash of the given key matches the hash in thoth script.
+            """
+            #!checking of the given key is correct: not used anymore as we have already done it before we call this function
             givenHash = eval(open(joinAddr(self.path, f"{self.name}.ththscrpt"), "r").read())['hash']
             hashKey = mdHash(key.decode())
             if hashKey != givenHash:
                 print(f"Wrong key given for folder {self.name}")
                 return 'WRONGKEY'
+            """
 
         #we can now modify every single file.
         fileCount = 0

@@ -107,6 +107,18 @@ class Directory:
             return files    
         return fileList(self)
 
+    def getCompleteFolderPathList(self):
+        def folderlist(direct:Directory):
+            folders = list()
+            for item in direct.contents:
+                itemPath = joinAddr(direct.path, item.name)
+                if not isFile(itemPath):
+                    folders.append(itemPath)
+                    recursed = folderlist(item)
+                    folders.extend(recursed)
+            return folders    
+        return folderlist(self)
+
     def getSize(self):
         totalSize = 0
         for itemPath in self.getCompleteFilePathList():
@@ -136,8 +148,7 @@ class Directory:
     #function returns a string if there are any errors, None if successful.
     def modifyDirectory(self, isEncrypting:bool, key:bytes, nestvalue:int=0):
         thothInfo = {
-            "hash" : None,
-            "files" : []
+            "hash" : None
         }
 
         if isEncrypting:
@@ -153,14 +164,11 @@ class Directory:
             if not os.path.exists(joinAddr(self.path, f"{self.name}.ththscrpt")):
                 print(f"Folder {self.name} has not been encrypted by Thoth. Not decryptable.")
                 return 'UNDECRYPTABLE'
-            """
-            #!checking of the given key is correct: not used anymore as we have already done it before we call this function
             givenHash = eval(open(joinAddr(self.path, f"{self.name}.ththscrpt"), "r").read())['hash']
             hashKey = mdHash(key.decode())
             if hashKey != givenHash:
                 print(f"Wrong key given for folder {self.name}")
                 return 'WRONGKEY'
-            """
 
         #we can now modify every single file.
         fileCount = 0
@@ -175,9 +183,6 @@ class Directory:
                     successCount-=1
                     print(f"{nestvalue * '    '}FILE {fileCount}/{self.totalFileCount}: {item.name} modification error: {path}")
                 else:
-                    if isEncrypting:
-                        #!append the encrypted paths into the thoth script during encryption process.
-                        thothInfo['files'].append(path)
                     print(f"{nestvalue * '    '}FILE {fileCount}/{self.totalFileCount}: {item.name} successfully modifed.")
             elif type(item) == Directory:
                 dirCount+=1
@@ -205,10 +210,7 @@ if __name__ == "__main__":
     inp = input()
     inpl = inp.split(sep=' ')
     print(inpl)
-
     sampleDirec = path2Dir(inpl[0])
-    sampleDirec.printContents()
-    
-    passw = input()
-    key = generateKey(passw)
-    sampleDirec.modifyDirectory(True, key)
+    l = sampleDirec.getCompleteFolderPathList()
+    for x in l:
+        print(x)

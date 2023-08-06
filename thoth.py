@@ -5,10 +5,8 @@ import tkinter as tk
 from tkinter import filedialog
 from fileclass import *
 import saveload
-import sys
 from tkinter import messagebox
 import time
-from cryptography import fernet
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -31,7 +29,7 @@ def checkPass():
         global globalWrongTries
         globalWrongTries += 1
         saveload.setData('wrongTries', globalWrongTries)
-        messagebox.showerror('Wrong passcode', f'The passcode entered does not match the passcode used for the encryption of this folder. Number of wrong attempts to access this folder: {globalWrongTries}')
+        messagebox.showerror('Wrong passcode', f'The passcode entered does not match the passcode used for the encryption of this folder. {globalWrongTries} wrong attempts so far.')
         return False
     return True
 
@@ -61,10 +59,10 @@ def translateListBox():
         #showing the listbox with updated titles.
         showListBox(dirlistbox, newTitles)
         statusLabel2.config(text="Translated encrypted names into their original names.", fg=purpleTextColor)
+        globalIsTranslatedBoolean = not globalIsTranslatedBoolean
     else:
-        refreshListBox(None, globalCurrentDirectoryObject.path)
         dirlistbox.config(fg=blueTextColor)
-    globalIsTranslatedBoolean = not globalIsTranslatedBoolean
+        refreshListBox(None, globalCurrentDirectoryObject.path)
 
 def centerWindow(window, width, height):
     # Get the screen width and height
@@ -94,13 +92,19 @@ def showListBox(listbox:tk.Listbox, items:list):
 def appendListBox(listbox:tk.Listbox, item: str):
     listbox.insert(tk.END, item)
 
+globalTotalFilesFound = 0
+
 # function is RECURSIVE! 
 def showDirectory(e, directory:str, nestvalue:int=0):
+    global globalCurrentDirectoryObject
     targetDirectory = path2Dir(directory)
     fileCount = 0
     dirCount = 0
+    global globalTotalFilesFound
     for item in targetDirectory.contents:
+        statusLabel2.config(text=f'{item.name} discovered.')
         if isinstance(item, File):
+            globalTotalFilesFound += 1
             fileCount += 1
             title = f"{nestvalue * '    '}FILE {fileCount}/{targetDirectory.totalFileCount}: {item.name} - {sizeToString(item.getSize())}"
             appendListBox(dirlistbox, title)
@@ -111,8 +115,8 @@ def showDirectory(e, directory:str, nestvalue:int=0):
             appendListBox(dirlistbox, title)
             globalTitlePathDict[title] = item.path
             showDirectory(None, item.path, nestvalue + 1)
+        statusLabel.config(text=f'Searching target folder... {globalTotalFilesFound} files found so far.')
         root.update()
-    global globalCurrentDirectoryObject
     globalCurrentDirectoryObject = targetDirectory
     return targetDirectory
 
@@ -127,20 +131,29 @@ def showStatus(directory):
         statusLabel.config(text=f'{name} has {filecount} files, {dircount} subfolders. Including subfolders, {completefilecount} files with total size {size}')
         showRightFrame(not directory.isEncrypted)
         deleteFileButton.config(state='disabled')
+    global globalTotalFilesFound
+    globalTotalFilesFound = 0
+    global globalIsTranslatedBoolean
+    globalIsTranslatedBoolean = False
     lookInFolderButton.config(state='disabled')
     renameButton.config(state='disabled')
     deleteFileButton.config(state='disabled')
     dirBox.delete(0, tk.END)
     dirBox.insert(0, directory)
-    statusLabel.config(text=f'Searching {directory}...')
     time.sleep(0.1)
     startTime = time.time()
+    dirBox.config(state='disabled')
+    findDirectoryButton.config(state='disabled')
+    refreshButton.config(state='disabled')
     changeStatusLabel(showDirectory(None, directory))
+    refreshButton.config(state='normal')
+    findDirectoryButton.config(state='normal')
+    dirBox.config(state='normal')
     endTime = time.time()
     #apparently '.3g' is the 3sf specifier????
     statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):.3g} seconds.', fg='white')
-    #change listbox color based on if file is encrypted or not.
-    if globalCurrentDirectoryObject.isEncrypted:
+    #change listbox color based on if file is encrypted or not.s
+    if globalCurrentDirectoryObject.isEncrypted: #this is going on r/programminghorror for sure
         dirlistbox.config(bg=encrListCol, fg=blueTextColor, selectbackground=blueTextColor, selectforeground=encrListCol)
         leftFrame.config(bg=encrBGCol)
         rightFrame.config(bg=encrSideCol)
@@ -148,6 +161,7 @@ def showStatus(directory):
         statusLabel2.config(bg=encrBGCol)
         targetLabel.config(bg=encrBGCol)
         passcodeLabel.config(bg=encrBGCol)
+        buttonLF.config(bg=encrBGCol)
     else:
         dirlistbox.config(bg=normalListCol, fg=greenTextColor, selectbackground=greenTextColor, selectforeground=normalListCol)
         leftFrame.config(bg=normalBGCol)
@@ -156,6 +170,7 @@ def showStatus(directory):
         statusLabel2.config(bg=normalBGCol)
         targetLabel.config(bg=normalBGCol)
         passcodeLabel.config(bg=normalBGCol)
+        buttonLF.config(bg=normalBGCol)
     return
 
 #show the selected directory again, referring to the textbox instead of the directory finder
@@ -164,7 +179,7 @@ def refreshListBox(e, directory:str):
     #I assume there are more 'crucial' folders but this should be enough, I put full trust in the user to encrypt responsibly
     if directory.endswith(':') or directory == os.path.expanduser("~") or len(directory.split('\\')) == 2:
         if not messagebox.askyesno(f"Dangerous folder", f"Thoth does not reccommend encrypting or even looking into {directory} due to its size and importance. Look into it anyway?"):
-            return
+            return 'NOTRECCOMMEND'
     if directory == "":
         hideRightFrame()
         return
@@ -183,8 +198,13 @@ def refreshListBox(e, directory:str):
 def searchDirectory():
     globalTitlePathDict.clear()
     filepath = filedialog.askdirectory(title='Select target directory...')
+    #another warning hereeee
+    if filepath.endswith(':') or filepath == os.path.expanduser("~") or len(filepath.split('\\')) == 2:
+        if not messagebox.askyesno(f"Dangerous folder", f"Thoth does not reccommend encrypting or even looking into {filepath} due to its size and importance. Look into it anyway?"):
+            return
     if filepath == '':
         return
+    hideRightFrame()
     showListBox(dirlistbox, [])
     filepath = filepath.replace('/', '\\')
     showStatus(filepath)
@@ -209,18 +229,22 @@ def lookInFolder():
     refreshListBox(None, globalCurrentlySelectedPath)
 
 #binded to the button that says "Encrypt folder"
-#the folder encryption function here is non-recursive, unlike the method modifyDirectory(), to better interact with tkinter widgets.
+#the folder encryption function here is non-recursive, unlike the object method modifyDirectory(), to better interact with tkinter widgets.
 def startModification(isEncrypting:bool):
     def start():
         modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
         encryptButton.pack_forget()
-        textBox.config(text='\nDo not close this window.\nTime taken may vary depending\non file size and storage type.')
+        textBox.config(text='\nIt seems like modification cannot start for some reason.\nRefreshing and trying again...')
         #encryption steps: modification, update current directory, update the list box.
         key = generateKey(passBox.get())
         global globalCurrentDirectoryObject
         currentDirectory = globalCurrentDirectoryObject.path
         startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        fileList = globalCurrentDirectoryObject.getCompleteFilePathList()
+        try:
+            fileList = globalCurrentDirectoryObject.getCompleteFilePathList()
+        except:
+            refreshListBox(None, dirBox.get())
+            start()
         folderList = globalCurrentDirectoryObject.getCompleteFolderPathList()
         thisPath = globalCurrentDirectoryObject.path
         thisName = globalCurrentDirectoryObject.name
@@ -290,9 +314,9 @@ def startModification(isEncrypting:bool):
             return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 130)
+    centerWindow(modWindow, 500, 120)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
-    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Arial', 10))
+    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Microsoft Sans Serif', 12))
     textBox.pack(padx=5, pady=(5, 5))
     encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
     encryptButton.pack(padx=5, pady=(5, 2))
@@ -306,26 +330,48 @@ def renameCurrentFile():
         if newName == "":
             messagebox.showerror("Name not entered", "You cannot have a blank filename wtf")
             return
-        newPath = globalCurrentlySelectedPath.replace(name, newName+extension)
+        newNameAndExtension = newName + extension
+        newName2 = newNameAndExtension
+        if globalIsTranslatedBoolean: #! before renaming the encrypted file, we must first encrypt the new name.
+            newNameAndExtension = Fernet(encryptionKey).encrypt(newNameAndExtension.encode()).decode() + '.thth'
+        newPath = globalCurrentlySelectedPath.replace(name, newNameAndExtension)
         renameWindow.destroy()
-        os.rename(globalCurrentlySelectedPath, newPath)
+        os.rename(globalCurrentlySelectedPath, newPath) #renaming the file itself.
+        #changing the listbox content
         selected = dirlistbox.curselection()
-        #changing the listbox
         if not selected:
+            print('unselected.')
             return
         itemSelected:str = dirlistbox.get(selected[0])
-        newText = itemSelected.replace(name, newName+extension)
+        if globalIsTranslatedBoolean: #! before changing the listbox content, if we are in translated mode, translate the file first before changing.
+            newText = itemSelected.replace(Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode(), newName2)
+        else:
+            newText = itemSelected.replace(name, newNameAndExtension)
         dirlistbox.delete(selected[0])
         dirlistbox.insert(selected[0], newText)
         #change the key-value pair in the globalDictionary
         globalTitlePathDict[newText] = globalTitlePathDict.pop(itemSelected)
         globalTitlePathDict[newText] = newPath
-    name = globalCurrentlySelectedPath.split('\\')[-1]
-    extension = os.path.splitext(name)[1]
+        print('renamed.')
+    global globalCurrentlySelectedPath
+    global globalIsTranslatedBoolean
+    if globalIsTranslatedBoolean:
+        if not checkPass():
+            return
+    encryptionKey = generateKey(passBox.get())
+    #getting the file extension
+    name = globalCurrentlySelectedPath.split('\\')[-1] #gets the pure filename
+    if name.endswith('.thth') and not globalIsTranslatedBoolean:
+        messagebox.showerror('Attempting to rename encrypted file', 'It is not advised that you rename an encrypted file. If you want to rename an encrypted file at its normal state, click on "Translate", select the desired file, then click on "Rename" again.')
+        return
+    extension = os.path.splitext(name)[1] #gets the file extension from the pure filename
+    if globalIsTranslatedBoolean: #! if file is encrypted, to get the extension, remove the .thth suffix first, decrypt the name, then get extension.
+        extension = os.path.splitext(Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode())[1] #getting the extension if name is encrypted
+    #creating the toplevel window
     renameWindow = tk.Toplevel(root)
     centerWindow(renameWindow, 300, 120)
     renameWindow.title("Rename file/folder")
-    label = tk.Label(renameWindow, text=f"Enter the new name for {name}.\nFile extension added automatically.")
+    label = tk.Label(renameWindow, text=f"Enter the new name for {name if not globalIsTranslatedBoolean else Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode()}.\nFile extension added automatically.")
     label.pack(pady=5, padx=10)
     nameEntry = tk.Entry(renameWindow, width=40, bg='#bababa')
     nameEntry.pack(pady=5, padx=10)
@@ -335,12 +381,12 @@ def renameCurrentFile():
     okButton = tk.Button(renameWindow, text='Rename', font=('Arial', 10), command=onSubmit)
     okButton.pack(pady=5)
 
-# GUI ##################################################################################################
+# GUI #######################################################################################################################################
 
 root = tk.Tk()
-root.title(f"Thoth {globalVersionNumber}")
+root.title(f"ThothCrypt {globalVersionNumber}")
 root.resizable(False, False)
-centerWindow(root, 1015, 665)
+centerWindow(root, 1020, 675)
 
 normalListCol = '#001e21'
 normalBGCol = '#003d45'
@@ -351,25 +397,31 @@ encrSideCol = '#002c5c'
 textColor = 'white'
 blueTextColor = '#96ffff'
 greenTextColor = '#bdffe4'
-purpleTextColor = '#96ffb2'
+purpleTextColor = '#a6ff47'
 root.config(bg=normalSideCol)
 
 #left frame, always here. parent is root
 leftFrame = tk.Frame(root, bg=normalBGCol, width=600, height=800)
-targetLabel = tk.Label(leftFrame, text='Target Folder', font=('Arial', 14), bg=normalBGCol, fg=textColor)
+targetLabel = tk.Label(leftFrame, text='Target Folder', font=('Microsoft Sans Serif', 14), bg=normalBGCol, fg=textColor)
 targetLabel.pack(pady=(10,2))
 
-dirBox = tk.Entry(leftFrame, font=('Arial', 13), width=70)
+dirBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=70)
 dirBox.bind('<Return>', lambda e: refreshListBox(e, dirBox.get()))
 dirBox.pack(padx=5, pady=5)
 
-findDirectoryButton = tk.Button(leftFrame, text='Search for folder...', font=('Arial', 13), command=searchDirectory)
-findDirectoryButton.pack(padx=5, pady=5)
+buttonLF = tk.Frame(leftFrame, bg=normalBGCol)
+findDirectoryButton = tk.Button(buttonLF, text='Search for folder...', font=('Microsoft Sans Serif', 13), command=searchDirectory)
+findDirectoryButton.grid(column=0, row=0, padx=5)
+refreshButton = tk.Button(buttonLF, text='Refresh', font=('Microsoft Sans Serif', 13), command=lambda: refreshListBox(None, dirBox.get()))
+refreshButton.grid(column=1, row=0, padx=5)
+""" settingsButton = tk.Button(buttonLF, text='Settings', font=('Microsoft Sans Serif', 13), command=lambda: refreshListBox(None, dirBox.get()))
+settingsButton.grid(column=2, row=0, padx=5) """
+buttonLF.pack(padx=10, pady=10)
 
-passcodeLabel = tk.Label(leftFrame, text='Encryption Passcode', font=('Arial', 14), bg=normalBGCol, fg=textColor)
+passcodeLabel = tk.Label(leftFrame, text='Encryption Passcode', font=('Microsoft Sans Serif', 14), bg=normalBGCol, fg=textColor)
 passcodeLabel.pack()
 
-passBox = tk.Entry(leftFrame, font=('Arial', 13), width=30, show='●')
+passBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=30, show='●')
 passBox.pack(padx=5, pady=5)
 #scrollable listbox
 scrollbar = tk.Scrollbar(root, orient=tk.VERTICAL, width=20)
@@ -381,8 +433,10 @@ dirlistbox = tk.Listbox(
     )
 horizontalScrollBar.config(command=dirlistbox.xview)
 scrollbar.config(command=dirlistbox.yview)
-dirlistbox.pack(padx=20, pady=(10,0))
-horizontalScrollBar.pack(pady=(0,10), fill=tk.X, padx=20)
+dirlistbox.pack(padx=20, pady=(10,0), expand=False)
+dirlistbox.pack_propagate(False)
+horizontalScrollBar.pack(pady=(0,10), fill=tk.X, padx=20, expand=False)
+horizontalScrollBar.pack_propagate(False)
 
 #function runs whenever something is selected from the listbox
 def fileSelected(event):
@@ -401,52 +455,85 @@ def fileSelected(event):
 
 #start whatever file/folder is being selected from the listbox
 def startFile(event):
+    global globalCurrentlySelectedPath
+    path = globalCurrentlySelectedPath
+    if globalIsTranslatedBoolean and isFile(path):
+        if checkPass():
+            dirlistbox.config(state='disabled')
+            storedpath = decryptSingleFile(path, generateKey(passBox.get()))
+            if isinstance(storedpath, Exception): #some error handling
+                messagebox.showerror('Error', f'Error decrypting file: {Exception}')
+                dirlistbox.config(state='normal')
+                return
+            #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
+            #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
+            #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
+            if messagebox.askyesno('Save changes into encrypted folder', 'Would you like to save any changes made to the previously opened file?'):
+                reEncryptSingleFile(storedpath, path, generateKey(passBox.get()))
+            dirlistbox.config(state='normal')
+            os.remove(storedpath)
+            return
     index = dirlistbox.nearest(event.y)
     if index < 0:
         print('nothing selected')
         return
     selected_item = dirlistbox.get(index)
-    os.system(f'start "" "{globalTitlePathDict[selected_item]}"')
+    filepath:str = globalTitlePathDict[selected_item]
+    if filepath.endswith('.thth'):
+        messagebox.showwarning('Opening encrypted file not reccommended', 'It is advised not to open an encrypted file as it would just show you useless scrambled info AND you run the risk of accidentally modifying the file, which might render it unrecoverable. If you want to open a single file at its encrypted state, click "Translate" first, then double click on your desired file.')
+        return
+    os.system(f'start "" "{filepath}"')
 
 #from the current target folder, navigate to parent folder and set it as the target folder.
 def gotoParentFolder():
-    dirBox.delete(0, tk.END)
     lastUnit = globalCurrentDirectoryObject.path.split(sep='\\')[-1]
     newPath = globalCurrentDirectoryObject.path.removesuffix('\\' + lastUnit)
+    if refreshListBox(None, newPath) == 'NOTRECCOMMEND':
+        return
     dirBox.delete(0, tk.END)
     dirBox.insert(0, newPath)
-    refreshListBox(None, newPath)
     lookInFolderButton.config(state='disabled')
+
+def rightClick(event):
+    index = dirlistbox.nearest(event.y)
+    if index < 0:
+        print('nothing selected')
+        return
+    selected = dirlistbox.get(index)
+    global globalTitlePathDict
+    name = globalTitlePathDict[selected].split(sep='\\')[-1]
+    messagebox.showinfo(f"{name}: Full Path", f"{globalTitlePathDict[selected]}")
 
 dirlistbox.bind('<<ListboxSelect>>', fileSelected)
 dirlistbox.bind('<Double-Button-1>', startFile)
+dirlistbox.bind("<Button-3>", rightClick)
 
-statusLabel = tk.Label(leftFrame, text='No Folder Displayed.', font=('Arial', 13), bg=normalBGCol, fg=textColor)
-statusLabel.pack(pady=(0, 10))
-statusLabel2 = tk.Label(leftFrame, text='', font=('Arial', 13), bg=normalBGCol, fg=textColor)
-statusLabel2.pack(pady=(0, 10))
+statusLabel = tk.Label(leftFrame, text='No Folder Displayed.', font=('Microsoft Sans Serif', 13), bg=normalBGCol, fg=textColor)
+statusLabel.pack(pady=(0, 0))
+statusLabel2 = tk.Label(leftFrame, text='', font=('Microsoft Sans Serif', 13), bg=normalBGCol, fg=textColor, width=75)
+statusLabel2.pack(pady=(0, 10), expand=False)
+statusLabel2.pack_propagate(False)
 
 #first, pack the buttons that will be in BOTH encrypted and decrypted mode.
 rightFrame = tk.Frame(root, bg=normalSideCol, width=200, height=800)
-parentFolderButton = tk.Button(rightFrame, text='Parent Folder', font=('Arial', 13), command=gotoParentFolder)
+parentFolderButton = tk.Button(rightFrame, text='Parent Folder', font=('Microsoft Sans Serif', 13), command=gotoParentFolder)
 parentFolderButton.pack(padx=15, pady=(14, 4))
-lookInFolderButton = tk.Button(rightFrame, text='Look in Folder', font=('Arial', 13), command=lookInFolder)
+lookInFolderButton = tk.Button(rightFrame, text='Look in Folder', font=('Microsoft Sans Serif', 13), command=lookInFolder)
 lookInFolderButton.pack(padx=15, pady=(14, 4))
-deleteFileButton = tk.Button(rightFrame, text='Delete', font=('Arial', 13), command=deleteSelectedFile, state='disabled', fg='red')
+deleteFileButton = tk.Button(rightFrame, text='Delete', font=('Microsoft Sans Serif', 13), command=deleteSelectedFile, state='disabled', fg='red')
 deleteFileButton.pack(padx=7, pady=(14, 4))
-
+renameButton = tk.Button(rightFrame, text='Rename', font=('Microsoft Sans Serif', 13), command=renameCurrentFile, state='disabled')
+renameButton.pack(padx=7, pady=(14, 4))
 #then, pack the exclusive buttons into seperate frames.
 #when folder is normal, display normalButtonFrame
 normalButtonFrame = tk.Frame(rightFrame, bg=normalSideCol)
-renameButton = tk.Button(normalButtonFrame, text='Rename', font=('Arial', 13), command=renameCurrentFile, state='disabled')
-renameButton.pack(padx=7, pady=(14, 4))
-encryptFolderButton = tk.Button(normalButtonFrame, text='Encrypt Folder', font=('Arial', 13), command=lambda: startModification(True), fg=encrListCol, bg=blueTextColor)
+encryptFolderButton = tk.Button(normalButtonFrame, text='Encrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(True), fg=encrListCol, bg=blueTextColor)
 encryptFolderButton.pack(padx=15, pady=(14, 4))
 #when folder is encrypted, display encrButtonFrame
 encrButtonFrame = tk.Frame(rightFrame, bg=encrSideCol)
-translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Arial', 13), command=translateListBox)
+translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Microsoft Sans Serif', 13), command=translateListBox)
 translateFolderButton.pack(padx=15, pady=(15, 7))
-decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Arial', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
+decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
 decryptFolderButton.pack(padx=15, pady=7)
 
 leftFrame.grid(column=0, row=0, sticky=tk.N+tk.S+tk.E+tk.W)

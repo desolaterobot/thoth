@@ -75,3 +75,49 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
     except Exception as e:
         return e
     return newPath
+#decrypt a single file, place it into a directory on the computer temporarily, then run it.
+
+def decryptSingleFile(filePath:str, key:bytes):
+
+    #check if filepath ends with .thth, anything that doesn't will not be decrypted.
+    if not filePath.endswith(".thth"):
+        return Exception('Not decryptable by Thoth')
+    
+    #delete any existing temporary files first.
+    for file in os.listdir(os.path.expanduser("~")+f"\AppData\Local\Thoth"):
+        fullPath = os.path.expanduser("~")+f"\AppData\Local\Thoth\{file}"
+        if file != 'data.ththscrpt' and os.path.isfile(fullPath):
+            os.remove(fullPath)
+
+    #get actual file name, create a temporary path
+    encrName = filePath.split(sep='\\')[-1]
+    actualName = Fernet(key).decrypt(encrName.removesuffix(".thth").encode()).decode()
+    tempPath = os.path.expanduser("~")+f"\AppData\Local\Thoth\{actualName}"
+    
+    #read and decrypt the contents of the file
+    with open(filePath, 'rb') as file:
+        data = file.read()
+    modified = None
+    try:
+        modified = Fernet(key).decrypt(data)
+    except Exception as e:
+        return e
+    
+    #write the contents to a file into the temporary path
+    with open(tempPath, 'wb') as encrypted_file:
+        encrypted_file.write(modified)
+    
+    #run the file.
+    os.system(f'start "" "{tempPath}"')
+    return tempPath
+
+def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
+    with open(tempPath, 'rb') as file:
+        data = file.read() #data contains bytes data of the 
+    modified = None 
+    try:
+        modified = Fernet(key).encrypt(data)
+    except Exception as e:
+        return e
+    with open(resultPath, 'wb') as encrypted_file:
+        encrypted_file.write(modified)

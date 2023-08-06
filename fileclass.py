@@ -64,7 +64,6 @@ class Directory:
         self.isEncrypted = False
         totalFileCount = 0
         totalDirCount = 0
-        #setting the contents list.
         try:
             for item in os.listdir(self.path):
                 fileAddr = joinAddr(self.path, item)
@@ -85,14 +84,32 @@ class Directory:
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount
 
+    #delete this directory
     def delete(self):
         try:
             os.rmdir(self.path)
         except Exception as e:
             print(f"Error deleting directory: {e}")
     
+    #recursive approach of getting ONLY the COMPLETE filecount of the directory. nothing else, just the number
+    def getCompleteFileCount(self)->int:
+        def getCFC(directory: Directory):
+            if directory.totalDirCount == 0:
+                return directory.totalFileCount
+            else:
+                dirList = []
+                for item in directory.contents:
+                    if isinstance(item, Directory):
+                        dirList.append(item)
+                #dirList is a list of directories contained within current directory
+                childrenTotal = 0
+                for folder in dirList:
+                    childrenTotal += getCFC(folder)
+                return childrenTotal + directory.totalFileCount
+        return getCFC(self)
+    
     #returns a list of the complete paths of every file within a directory, even within the subdirectories.
-    def getCompleteFilePathList(self):
+    def getCompleteFilePathList(self)->list:
         def fileList(direct:Directory):
             files = list()
             for item in direct.contents:
@@ -107,6 +124,7 @@ class Directory:
             return files    
         return fileList(self)
 
+    #returns a list of the complete paths of each subfolder inside the current folder.
     def getCompleteFolderPathList(self):
         def folderlist(direct:Directory):
             folders = list()
@@ -119,6 +137,7 @@ class Directory:
             return folders    
         return folderlist(self)
 
+    #get size of current folder.
     def getSize(self):
         totalSize = 0
         for itemPath in self.getCompleteFilePathList():
@@ -150,7 +169,6 @@ class Directory:
         thothInfo = {
             "hash" : None
         }
-
         if isEncrypting:
             #!before we encrypt, check if this folder already contains files encrypted by Thoth.
             #!folders are considered encrypted ONLY when they contain the Thoth script.
@@ -169,12 +187,10 @@ class Directory:
             if hashKey != givenHash:
                 print(f"Wrong key given for folder {self.name}")
                 return 'WRONGKEY'
-
         #we can now modify every single file.
         fileCount = 0
         dirCount = 0
         successCount = self.totalFileCount
-        
         for item in self.contents:
             if type(item) == File:
                 fileCount+=1
@@ -188,9 +204,7 @@ class Directory:
                 dirCount+=1
                 print(f"{nestvalue * '    '}FOLDER {dirCount}/{self.totalDirCount}: {item.name} opened for modification.")
                 item.modifyDirectory(isEncrypting, key, nestvalue+1)
-        
         print(f"{nestvalue * '    '}WITHIN {self.name}: {successCount}/{self.totalFileCount} FILES SUCCESSFULLY MODIFIED")
-        
         if isEncrypting:
             #!after encryption... we save the data into a thoth script file.
             thothFile = open(joinAddr(self.path, f"{self.name}.ththscrpt"), 'w')
@@ -205,12 +219,3 @@ def path2Dir(path:str):
     name = p[-1]
     parentPath = path.removesuffix('\\' + name)
     return Directory(parentPath, name)
-
-if __name__ == "__main__":
-    inp = input()
-    inpl = inp.split(sep=' ')
-    print(inpl)
-    sampleDirec = path2Dir(inpl[0])
-    l = sampleDirec.getCompleteFolderPathList()
-    for x in l:
-        print(x)

@@ -468,7 +468,7 @@ def startFile(event):
             #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
             #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
             #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
-            if messagebox.askyesno('Save changes into encrypted folder', 'Would you like to save any changes made to the previously opened file?'):
+            if messagebox.askyesno('File opened', 'Continue using ThothCrypt?'):
                 reEncryptSingleFile(storedpath, path, generateKey(passBox.get()))
             dirlistbox.config(state='normal')
             os.remove(storedpath)

@@ -2,6 +2,8 @@
 
 ### ThothCrypt is a simple graphical program to encrypt entire folders just by using a single passcode, made in Python. Fernet encryption from the cryptography package is used for symmetric encryption and Tkinter is used to handle the GUI.
 
+### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Do not forget important passcodes and know your folder locations!
+
 ### 1. [Getting Started](#getting-started)
 ### 2. [Caveats](#caveats)
 ### 3. [Extra Features](#extra-features)
@@ -38,6 +40,8 @@ Once we are sure that the target folder is the folder we want to encrypt, we can
 
 Once a passcode is entered, we can click on `Encrypt Folder` and begin encrypting the entire folder. It is that simple! EVERY file in the folder will be encrypted, even those within subfolders. The names of the subfolders remain the same though.
 
+### Visual Differentiation
+
 Once all files within the folder are encrypted, the app turns from <b>green to blue</b>. The color difference is to differentiate normal folders and encrypted folders: app turns <b>green</b> if target folder is unencrypted and turns <b>blue</b> if target folder is encrypted.
 
 If we open the encrypted folder using the file explorer, we see that all of the filenames have turned into strings of random characters, appended with a .thth file extension. The encrypted folder also contains a small additional .ththscrpt file to mark it as encrypted. <b>DO NOT</b> delete this file or modify any of the encrypted files, as <b>any slight changes might render the encrypted files completely unrecoverable.</b>
@@ -45,6 +49,8 @@ If we open the encrypted folder using the file explorer, we see that all of the 
 ### Decryption
 
 If you want the folder back, you can follow the same steps as before, type in the same passcode that you used to encrypt the folder, then click on the `Decrypt Folder` button, and the entire target folder will be back to normal, untouched.
+
+### Decrypting only one file
 
 If you have an encrypted folder, but you only need to <u>gain access to a <b>single</b> file,</u> you can click on the `Translate` button, which will translate all of the encrypted filenames to their original names. You can now double click on one of the files, which would only encrypt and run <u>ONLY</u> the file you selected and ignoring the rest, saving time.
 
@@ -107,4 +113,54 @@ A hash function is a function that takes in an input string of any length and sp
 Hash functions are irreversible, so it is near impossible to trace the input string of the hash function, just by knowing the hash result. It is important to know that if very simple input strings are used, it is possible to bruteforce hash results given enough time. Hence, it is advised to choose a complex passcode, though we do not try to limit you here.
 
 ### Modification of entire folders
-When a folder begins modification, it looks through every single filepath stored earlier from walking through the file, and reads each of the files contents. For each file, it feeds the file contents into the Fernet encryption function mentioned earlier in order to output the encrypted contents into the same file. 
+When a folder begins modification, it loops through every single filepath stored earlier from walking through the file, and reads each of the files contents. For each file, it feeds the file contents into the Fernet encryption function mentioned earlier in order to write back the encrypted contents into the same file: 
+
+```python
+#read data from this filepath
+with open(filePath, 'rb') as file:
+    data = file.read()
+#modify the data
+if isEncrypting:
+    modified = Fernet(key).encrypt(data)
+else:
+    modified = Fernet(key).decrypt(data)
+#then write back to it.
+with open(filePath, 'wb') as encrypted_file:
+    encrypted_file.write(modified)
+```
+
+The filename has to be encrypted as well, as filenames could reveal the contents of the file. The filename is encrypted using the same process, but when encrypting, we add the `.thth` extension to mark the file as encrypted by ThothCrypt.
+
+```python
+oldFileName = filePath.split(sep='\\')[-1]
+newFileName = None
+if isEncrypting:
+    #!if encrypting, add the .thth extension before renaming
+    newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
+else:
+    #!if decrypting... remove the .thth extension first before reverting to original filename.
+    newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+newPath = oldFilePath.replace(oldFileName, newFileName)
+#rename the file.
+os.rename(oldFilePath, newPath)
+```
+### Password Checking
+Folders can be encrypted and decrypted by using a single passcode and hashing the passcode into a usable key. However, Fernet does not have a built-in key checking function, which leads to problems if you misstype the passcode, leading to multiple keys and undesired behaviour:
+```python
+#what's supposed to happen:
+            key1                        key1
+normalFile -encryption-> encryptedFile -decryption-> normalFile
+```
+```python
+#what can happen if multiple passcodes are used to modify the same file:
+            key1                        key2
+normalFile -encryption-> encryptedFile -decryption-> undefinedFile
+```
+Hence we need to check that the passcode used for decryption is the same key used for encryption. We cannot store this passcode in the folder, or even in the PC Folders, as that would be a security risk. Hash functions come in handy here as well. During encryption, we hash the encryption key, then write it into a `.ththscrpt` file which will be placed inside the encryption folder. This way, when we decrypt, we shall check the hash of the key given for decryption against the hash inside of the `.ththscrpt` file, if both hashes are the same, this means that the key is the same as the key used for encryption, and decryption can proceed safely.
+
+### Single file decryption: a hardware consideration
+In a folder of encrypted files, sometimes we only need just one. It would not be feasible to decrypt an entire folder just to acccess one file as it would be too time-consuming. Hence, we have a dedicated process that optimises exactly that, by writing into the encrypted folder only when necessary.
+
+Usually, when files are modified, we read the file contents, modify it, then write it into the <b>SAME</b> file. However, to cut down on time, single file decryption <b>TRIES</b> not to write it back into the same file, but instead writes it into a temporary file within a folder in the computer, where it can be written fast. Ofcourse, this only makes a difference if the encrypted folder is stored in a slow drive, such as SD Cards or old HDD's, as it prevents writing into the said drive, only reading it. Once ThothCypt writes it into the folder in the PC, it can then run the file for the user. 
+
+ThothCrypt will then prompt the user if they want to save any changes made into the file. If the user chooses not to, ThothCrypt simply disposes of the temporary file. Only if the user chooses to save, ThothCrypt will re-encrypt the temporary file then save it into the encrypted folder.

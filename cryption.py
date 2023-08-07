@@ -111,6 +111,9 @@ def decryptSingleFile(filePath:str, key:bytes):
     os.system(f'start "" "{tempPath}"')
     return tempPath
 
+def compareFileContents(path1:str, path2:str)->bool:
+    return open(path1, 'rb').read() == open(path2, 'rb').read()
+
 def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
     with open(tempPath, 'rb') as file:
         data = file.read() #data contains bytes data of the 
@@ -119,5 +122,8 @@ def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
         modified = Fernet(key).encrypt(data)
     except Exception as e:
         return e
+    if modified == open(resultPath, 'rb').read():
+        print('No changes made to file.')
+        return
     with open(resultPath, 'wb') as encrypted_file:
         encrypted_file.write(modified)

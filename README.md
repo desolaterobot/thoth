@@ -5,9 +5,10 @@
 ### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
-### 2. [Caveats](#caveats)
+### 2. [Encryption Caveats](#caveats)
 ### 3. [Extra Features](#extra-features)
-### 4. [How It Works](#how-it-works)
+### 4. [Common Errors](#common-errors)
+### 5. [How It Works](#how-it-works)
 
 ## Getting Started
 
@@ -54,7 +55,7 @@ If you want the folder back, you can follow the same steps as before, type in th
 
 If you have an encrypted folder, but you only need to <u>gain access to a <b>single</b> file,</u> you can click on the `Translate` button, which will translate all of the encrypted filenames to their original names. You can now double click on one of the files, which would only encrypt and run <u>ONLY</u> the file you selected and ignoring the rest, saving time.
 
-## Caveats
+## Encryption Caveats
 
 There are some drawbacks to consider with file encryption:
 
@@ -80,6 +81,11 @@ Click the `Delete` button to remove a file. It can also remove entire folders an
 
 ### Translate Button
 Appearing only when the target folder is encrypted, this button translates the gibberish of the encrypted filenames into its original names. Passcode is required for this. In the translated mode, the filenames turn from blue to green. In this mode, you can rename or open the files as per normal. However, if you opened the file and have made changes to the file you want saved, you MUST click 'Yes' on the dialog box that shows up after the file is opened: INSERT PICTURE
+
+## Common Errors
+<b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. None that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
+
+<b>Folder already contains some encrypted/decrypted files:</b> The `Encrypt Folder` and `Decrypt Folder` buttons only work if EVERY file in the target folder is unencrypted or encrypted respectively. It does not work if the target folder is supposed to be encrypted, but contains some decrypted files or vice versa. For reference, an encrypted file is a file that has a string ofm random characters as names, followed by a `.thth` extension, and a folder that is supposed to be encrypted contains a file with the name of the folder as its name, followed by a `.ththscrpt` extension.
 
 ## How it works
 

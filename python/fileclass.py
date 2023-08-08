@@ -1,28 +1,22 @@
 #script is meant for directory and file related functions and classes
 
+from cryption import *
 import os
 from os.path import isfile as isFile
 import sys
-from cryption import *
-from saveload import *
 
 from colorama import Fore, Style
 import colorama
 colorama.init()
-
-# GLOBAL VARIABLES ############################################################################################################################
-
-# none yet?
 
 # FUNCTIONS ###################################################################################################################################
 
 def joinAddr(string1, string2):
     return string1 + '\\' + string2
 
-illegalExtensions = ['.ini', '.ththscrpt', '.git']
 #returns whether a given file is allowed to be seen by Thoth
 def isAllowed(filePath:str):
-    for extension in illegalExtensions:
+    for extension in saveload.getData('forbidden'):
         if filePath.endswith(extension):
             return False
     return True

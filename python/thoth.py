@@ -1,12 +1,14 @@
 #main script: renders window and GUI functions
 
+from fileclass import *
+from PIL import Image, ImageTk
 from tkinter import ttk
 import tkinter as tk
 from tkinter import filedialog
-from fileclass import *
-import saveload
 from tkinter import messagebox
 import time
+import string
+import random
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -47,7 +49,11 @@ def translateListBox():
         for title,path in globalTitlePathDict.items():
             if isFile(path):
                 encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
-                decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+                try:
+                    decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+                except:
+                    messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
+                    return
                 newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
                 newTitles.append(newTitle)
                 newDict[newTitle] = path
@@ -71,6 +77,7 @@ def centerWindow(window, width, height):
     x = (screenW // 2) - (width // 2)
     y = (screenH // 2) - (height // 2)
     window.geometry(f"{width}x{height}+{x}+{y}")
+    window.iconbitmap("python\\assets\\icon.ico")
 
 def showRightFrame(isNormal):
     rightFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
@@ -91,6 +98,14 @@ def showListBox(listbox:tk.Listbox, items:list):
 
 def appendListBox(listbox:tk.Listbox, item: str):
     listbox.insert(tk.END, item)
+
+def disableWidgets(widgetTuple:tuple):
+    for widget in widgetTuple:
+        widget.config(state='disabled')
+
+def enableWidgets(widgetTuple:tuple):
+    for widget in widgetTuple:
+        widget.config(state='normal')
 
 globalTotalFilesFound = 0
 
@@ -130,26 +145,17 @@ def showStatus(directory):
         completefilecount = len(directory.getCompleteFilePathList())
         statusLabel.config(text=f'{name} has {filecount} files, {dircount} subfolders. Including subfolders, {completefilecount} files with total size {size}')
         showRightFrame(not directory.isEncrypted)
-        deleteFileButton.config(state='disabled')
     global globalTotalFilesFound
     globalTotalFilesFound = 0
     global globalIsTranslatedBoolean
     globalIsTranslatedBoolean = False
-    lookInFolderButton.config(state='disabled')
-    renameButton.config(state='disabled')
-    deleteFileButton.config(state='disabled')
     dirBox.delete(0, tk.END)
     dirBox.insert(0, directory)
-    time.sleep(0.1)
+    disableWidgets((dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton))
     startTime = time.time()
-    dirBox.config(state='disabled')
-    findDirectoryButton.config(state='disabled')
-    refreshButton.config(state='disabled')
     changeStatusLabel(showDirectory(None, directory))
-    refreshButton.config(state='normal')
-    findDirectoryButton.config(state='normal')
-    dirBox.config(state='normal')
     endTime = time.time()
+    enableWidgets((dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton))
     #apparently '.3g' is the 3sf specifier????
     statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):.3g} seconds.', fg='white')
     #change listbox color based on if file is encrypted or not.s
@@ -229,7 +235,7 @@ def lookInFolder():
     refreshListBox(None, globalCurrentlySelectedPath)
 
 #binded to the button that says "Encrypt folder"
-#the folder encryption function here is non-recursive, unlike the object method modifyDirectory(), to better interact with tkinter widgets.
+#the folder encryption function here is non-recursive, unlike the object method modifyDirectory()
 def startModification(isEncrypting:bool):
     def start():
         modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
@@ -239,72 +245,90 @@ def startModification(isEncrypting:bool):
         key = generateKey(passBox.get())
         global globalCurrentDirectoryObject
         currentDirectory = globalCurrentDirectoryObject.path
-        startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        #*BEFORE FOLDER MODIFICATION, MAKE SOME CHECKS////////////////////////////////////////////////////////////////////////////////////////////////
+        
+        #getting the complete list of filepaths.
         try:
             fileList = globalCurrentDirectoryObject.getCompleteFilePathList()
         except:
-            refreshListBox(None, dirBox.get())
+            #error getting list
+            showDirectory(None, dirBox.get())
             start()
+        
+        #check if the folder is COMPLETELY encrypted or unencrypted.
+        for file in fileList:
+            if globalCurrentDirectoryObject.isEncrypted:
+                if not file.endswith('.thth'):
+                    messagebox.showerror('Folder contains some unencrypted files.', 'The folder marked for decryption already contains unencrypted files. Look into the folder which contains them and delete/encrypt them first.')
+                    return
+            else:
+                if file.endswith('.thth'):
+                    modWindow.destroy()
+                    messagebox.showerror('Folder contains some encrypted files.', 'The folder marked for encryption already contains some encrypted files. Look into the folder which contains them and delete/decrypt them first.')
+                    return
+            
+        #get list of folders and subfolders.
         folderList = globalCurrentDirectoryObject.getCompleteFolderPathList()
         thisPath = globalCurrentDirectoryObject.path
         thisName = globalCurrentDirectoryObject.name
         folderList.append(thisPath)
         totalFileNum = len(fileList)
         encryptionProgress = 1
-        failureCount = 0
         thothInfo = {
             "hash" : None
         }
+        thothInfo['hash'] = mdHash(key.decode())
 
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=300, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
-
-        if isEncrypting:
-            #!before we encrypt, check if this folder already contains files encrypted by Thoth.
-            #!folders are considered encrypted ONLY when they contain the Thoth script.
-            if os.path.exists(joinAddr(thisPath, f"{thisName}.ththscrpt")):
-                messagebox.showerror('Folder is already encrypted.', 'No need to encrypt it again!')
-            #!write the md5 hash of the key into the thoth template
-            thothInfo['hash'] = mdHash(key.decode())
-        else:
-            #!before we decrypt, check if thoth script exists in the current folder.
-            if not os.path.exists(joinAddr(thisPath, f"{thisName}.ththscrpt")):
-                messagebox.showerror('This folder is not yet encrypted by Thoth', 'Hence, this cannot be decrypted.')
-            givenHash = eval(open(joinAddr(thisPath, f"{thisName}.ththscrpt"), "r").read())['hash']
-            hashKey = mdHash(key.decode())
-            if hashKey != givenHash:
-                print(f"Wrong key given for folder {thisName}")
             
+        disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
+
+        startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////``
+        failures = []
+        piece = (100 / totalFileNum)
         for filePath in fileList:
             message = f"Now {'encrypting:' if isEncrypting else 'decrypting:'}\n{filePath}\n({sizeToString(os.path.getsize(filePath))}) Progress:{encryptionProgress}/{totalFileNum}"
-            progressBar['value'] += (100 / totalFileNum)
+            progressBar['value'] += piece
             e = modifyFile(isEncrypting, filePath, key)
             print(message)
             textBox.config(text=message)
-            root.update()
             if isinstance(e, Exception):
-                failureCount += 1
-                messagebox.showerror(f'Error: {e}', f'Error modifying {filePath}')
+                failures.append(filePath)
+            root.update()
             encryptionProgress += 1
+        endTime = time.time() #*END OF MODIFICATION PROCESS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         
+        root.update()
+        piece = (100 / len(folderList))
+
         if isEncrypting:
             #!after encryption... we save the data into a .ththscrpt file in each subfolder, to signify an encryption by Thoth
             for folderPath in folderList:
                 textBox.config(text=f"Placing folder data...\n{folderPath}")
-                root.update()
                 name = folderPath.split(sep='\\')[-1]
                 open(joinAddr(folderPath, f"{name}.ththscrpt"), "w").write(str(thothInfo))
         else:
             #!after decryption... we remove the .ththscrpt file entirely in each subfolder, to show that the folder is normal.
             for folderPath in folderList:
                 name = folderPath.split(sep='\\')[-1]
-                os.remove(joinAddr(folderPath, f"{name}.ththscrpt"))
+                folderScriptPath = joinAddr(folderPath, f"{name}.ththscrpt")
+                if mdHash(key.decode()) == eval(open(folderScriptPath, 'r').read())['hash']:
+                    #the hash inside this script matches the hash of the passcode given.
+                    os.remove(folderScriptPath)
 
-        endTime = time.time() #*END OF MODIFICATION PROCESS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
+        enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
         refreshListBox(None, currentDirectory) #update listbox
-        statusLabel2.config(text=f"Time taken to {'encrypt' if isEncrypting else 'decrypt'} target directory: {(endTime-startTime):.3g} seconds.", fg='white')
+        statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {(endTime-startTime):.3g} seconds. {len(failures)} failures.", fg='white')
+        if failures:
+            failureList = ""
+            for file in failures:
+                failureList = failureList + '\n' + file
+            messagebox.showwarning('Some files failed to be modified', f'Please check on the state of these files:\n{failureList}')
         modWindow.destroy()
+    
     global globalCurrentDirectoryObject
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
@@ -314,7 +338,7 @@ def startModification(isEncrypting:bool):
             return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 120)
+    centerWindow(modWindow, 500, 125)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
     textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Microsoft Sans Serif', 12))
     textBox.pack(padx=5, pady=(5, 5))
@@ -381,6 +405,81 @@ def renameCurrentFile():
     okButton = tk.Button(renameWindow, text='Rename', font=('Arial', 10), command=onSubmit)
     okButton.pack(pady=5)
 
+def openFileExplorer():
+    if not globalCurrentDirectoryObject == None:
+        filedialog.askopenfilename(initialdir=globalCurrentDirectoryObject.path)
+
+def openSettings():
+    def saveSettings():
+        extensions = extensionsBox.get().strip(', ').split(sep=',')
+        for e in extensions:
+            if not e.startswith('.'):
+                messagebox.showerror('Invalid file extension',f'{e} is not a valid file extension.')
+                return
+        extensions.append('.ththscrpt')
+        extensions = list(set(extensions))
+        saveload.setData('forbidden', extensions)
+        settingsWindow.destroy()
+    
+    def generatePasscode():
+        passc = ""
+        completeCharList = string.ascii_letters + string.digits + string.punctuation
+        charListLen = len(completeCharList)
+        for x in range(32):
+            passc += completeCharList[random.randint(0, charListLen-1)]
+        passGenBox.delete(0, tk.END)
+        passGenBox.insert(0, passc)
+    
+    def saveToDesktop(num=1):
+        password = passGenBox.get()
+        if not password:
+            messagebox.showerror('No passcode generated', "No passcode generated, nothing is saved. Click on 'Generate And Enter' first.")
+            return
+        if globalCurrentDirectoryObject:
+            addr = joinAddr(os.path.expanduser("~/Desktop"), f"{globalCurrentDirectoryObject.name}{num}.txt")
+            name = globalCurrentDirectoryObject.name + f'{num}.txt'
+        else:
+            addr = joinAddr(os.path.expanduser("~/Desktop"), f"passcode{num}.txt")
+            name = f'passcode{num}.txt'
+
+        if not os.path.exists(addr):
+            open(addr, 'w').write(password)
+        else:
+            saveToDesktop(num+1)
+        messagebox.showinfo('Passcode saved!', f'Passcode saved on your desktop: {name}\nHide it before someone finds it!')
+
+    settingsWindow = tk.Toplevel()
+    settingsWindow.title('ThothCrypt Settings')
+    centerWindow(settingsWindow, 500, 500)
+    settingsWindow.focus_force()
+    settingsWindow.config(bg=normalSideCol)
+    #forbidden file extensions
+    label1 = tk.Label(settingsWindow, text='Forbidden file extensions', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
+    label1.pack(pady=(10,0))
+    label2 = tk.Label(settingsWindow, text='Thoth ignores all files that contains these extensions.\nType them as seperated by only commas.', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
+    label2.pack(pady=(0,2))
+    startingEntry = ""
+    for item in saveload.getData('forbidden'):
+        if item == '.ththscrpt':
+            continue
+        startingEntry = startingEntry + item + ','
+    extensionsBox = tk.Entry(settingsWindow, font=('Microsoft Sans Serif', 13), width=40)
+    extensionsBox.insert(0, startingEntry)
+    extensionsBox.pack(padx=5, pady=5)
+    saveButton = tk.Button(settingsWindow, text='Save', font=('Microsoft Sans Serif', 13), command=saveSettings)
+    saveButton.pack(pady=(5,5))
+    #passcode generator
+    label3 = tk.Label(settingsWindow, text='Passcode Generator', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
+    label3.pack(pady=(10,0))
+    label4 = tk.Label(settingsWindow, text='Generate a safe 32-character passcode.', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
+    label4.pack(pady=(0,2))
+    passGenBox = tk.Entry(settingsWindow, font=('Microsoft Sans Serif', 13), width=40)
+    passGenBox.pack(padx=5, pady=5)
+    generateButton = tk.Button(settingsWindow, text='Generate', font=('Microsoft Sans Serif', 13), command=generatePasscode)
+    generateButton.pack(pady=(5,5))
+    generateButton = tk.Button(settingsWindow, text='Store In Desktop', font=('Microsoft Sans Serif', 13), command=saveToDesktop)
+    generateButton.pack(pady=(5,5))
+
 # GUI #######################################################################################################################################
 
 root = tk.Tk()
@@ -414,14 +513,16 @@ findDirectoryButton = tk.Button(buttonLF, text='Search for folder...', font=('Mi
 findDirectoryButton.grid(column=0, row=0, padx=5)
 refreshButton = tk.Button(buttonLF, text='Refresh', font=('Microsoft Sans Serif', 13), command=lambda: refreshListBox(None, dirBox.get()))
 refreshButton.grid(column=1, row=0, padx=5)
-""" settingsButton = tk.Button(buttonLF, text='Settings', font=('Microsoft Sans Serif', 13), command=lambda: refreshListBox(None, dirBox.get()))
-settingsButton.grid(column=2, row=0, padx=5) """
+openFolderButton = tk.Button(buttonLF, text='Open', font=('Microsoft Sans Serif', 13), command=openFileExplorer)
+openFolderButton.grid(column=2, row=0, padx=5)
+settingsButton = tk.Button(buttonLF, text='Settings', font=('Microsoft Sans Serif', 13), command=openSettings)
+settingsButton.grid(column=3, row=0, padx=5)
 buttonLF.pack(padx=10, pady=10)
 
 passcodeLabel = tk.Label(leftFrame, text='Encryption Passcode', font=('Microsoft Sans Serif', 14), bg=normalBGCol, fg=textColor)
 passcodeLabel.pack()
 
-passBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=30, show='●')
+passBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=40, show='●')
 passBox.pack(padx=5, pady=5)
 #scrollable listbox
 scrollbar = tk.Scrollbar(root, orient=tk.VERTICAL, width=20)
@@ -459,18 +560,17 @@ def startFile(event):
     path = globalCurrentlySelectedPath
     if globalIsTranslatedBoolean and isFile(path):
         if checkPass():
-            dirlistbox.config(state='disabled')
             storedpath = decryptSingleFile(path, generateKey(passBox.get()))
             if isinstance(storedpath, Exception): #some error handling
                 messagebox.showerror('Error', f'Error decrypting file: {Exception}')
-                dirlistbox.config(state='normal')
                 return
+            disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton))
             #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
             #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
             #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
-            if messagebox.askyesno('File opened', 'Continue using ThothCrypt?'):
-                reEncryptSingleFile(storedpath, path, generateKey(passBox.get()))
-            dirlistbox.config(state='normal')
+            if messagebox.askyesno('File opened', "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
+                reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
+            enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton))
             os.remove(storedpath)
             return
     index = dirlistbox.nearest(event.y)

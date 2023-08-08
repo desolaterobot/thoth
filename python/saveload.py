@@ -5,19 +5,22 @@ import os
 
 globalDir = os.path.expanduser("~")+"\AppData\Local\Thoth"
 
-#first time setup, create the directory and all the things in it, if havent.
-try:
-    os.mkdir(globalDir) #returns an error if directory already exists
+def firstTime():
+    #first time setup, create the directory and all the things in it, if havent.
+    try:
+        os.mkdir(globalDir) #returns an error if directory already exists
+    except:
+        pass
     empty = {
-        "forbidden" : ['.ini', '.ththscrpt', '.git'],
-        "wrongTries" : 0,
-    }
+            "forbidden" : ['.ini', '.ththscrpt', '.git'],
+            "wrongTries" : 0,
+        }
     open(globalDir + "\\" + "data.ththscrpt", "w").write(str(empty))
-except:
-    pass
 
 #get a value from the stored dictionary, if key does not exist, defaultData is returned and stored.
 def getData(key, defaultData=None):
+    if not os.path.exists(globalDir + "\\" + "data.ththscrpt"):
+        firstTime()
     data:dict = eval(open(globalDir + "\\" + "data.ththscrpt", "r").read())
     if key not in data:
         data[key] = defaultData
@@ -27,6 +30,8 @@ def getData(key, defaultData=None):
 
 #sets a key value pair to our stored dictionary
 def setData(key, value):
+    if not os.path.exists(globalDir + "\\" + "data.ththscrpt"):
+        firstTime()
     data:dict = eval(open(globalDir + "\\" + "data.ththscrpt", "r").read())
     data[key] = value
     open(globalDir + "\\" + "data.ththscrpt", "w").write(str(data))

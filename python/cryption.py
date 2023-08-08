@@ -1,5 +1,6 @@
 #script is for encryption and hash related functions
 
+import saveload
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -9,6 +10,11 @@ from hashlib import md5
 import tkinter as tk
 
 globalCurrentFileBeingModified = ""
+
+class EncryptionException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
 
 #generates a encryption key from a string seed
 def generateKey(seed:str):
@@ -32,7 +38,7 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
     #!if decrypting... check if filepath ends with .thth, if not then do not modify.
     if not isEncrypting:
         if not filePath.endswith(".thth"):
-            return Exception('Not decryptable by Thoth')
+            return EncryptionException('File is not decryptable by Thoth.')
     
     global globalCurrentFileBeingModified
     globalCurrentFileBeingModified = filePath
@@ -62,7 +68,7 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
         #!if encrypting, add the .thth extension before renaming
         try:
             newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
-        except:
+        except Exception as e:
             return e
     else:
         #!if decrypting... remove the .thth extension first before reverting to original filename.
@@ -122,8 +128,5 @@ def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
         modified = Fernet(key).encrypt(data)
     except Exception as e:
         return e
-    if modified == open(resultPath, 'rb').read():
-        print('No changes made to file.')
-        return
     with open(resultPath, 'wb') as encrypted_file:
         encrypted_file.write(modified)

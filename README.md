@@ -58,8 +58,7 @@ Once we are sure that the target folder is the folder we want to encrypt, we can
 Once a passcode is entered, we can click on `Encrypt Folder` and begin encrypting the entire folder. It is that simple! EVERY file in the folder will be encrypted, even those within subfolders. The names of the subfolders remain the same though.
 
 <p align="center">
-  <img src="readme/beginEncryption.png
-  " alt="Beginning encryption">
+  <img src="readme/beginEncryption.png" alt="Beginning encryption">
 <p align="center">
 
 ### Visual Differentiation

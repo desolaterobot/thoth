@@ -4,13 +4,17 @@
 
 # Named after the Egyptian god of sacred texts, ThothCrypt isn't far from mythology...
 
-### ThothCrypt is a simple graphical program to encrypt entire folders just by using a single passcode, made in Python. Fernet encryption from the cryptography package is used for symmetric encryption and Tkinter is used to handle the GUI.
+### ThothCrypt is a simple graphical program to encrypt entire folders just by using a single passcode, made in Python. Fernet encryption from the cryptography package is used for symmetric encryption and Tkinter is used to handle the GUI. Here's the main menu:
+
+<p align="center">
+  <img src="readme/mainmenu.png" alt="Main Menu">
+<p align="center">
 
 ### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
 ### 2. [Common Errors](#common-errors)
-### 3. [Encryption Caveats](#caveats)
+### 3. [Downsides to Encryption](#caveats)
 ### 4. [Extra Features](#extra-features)
 ### 5. [How It Works](#how-it-works)
 
@@ -21,7 +25,7 @@
 Upon opening the app, two text fields can be seen at the top. One for the Target Folder, and one for the chosen passcode. The first step is to choose a folder to encrypt. You could manually type out the path to your directory, but I'd imagine most people would click on `Search for folder...` which brings up a file explorer to select the folder graphically.
 
 <p align="center">
-  <img src="python/readme/searchforfolder.png" alt="Searching for a folder">
+  <img src="readme/searchforfolder.png" alt="Searching for a folder">
 <p align="center">
 
 Sidenote: 'directory' and 'folder' are used interchangeably here.
@@ -48,13 +52,13 @@ The result is an efficient way to display nested folder contents - every item in
 Once we are sure that the target folder is the folder we want to encrypt, we can start thinking of a passcode and typing it on the `Encryption Passcode` text field. As always, more secure passcodes have a mixture of numbers, upper and lowercase letters and symbols. However, in Thoth, password choices are not restricted. Any non-blank passcode can be used.
 
 <p align="center">
-  <img src="python/readme/enteringPasscode.png" alt="Entering the passcode">
+  <img src="readme/enteringPasscode.png" alt="Entering the passcode">
 <p align="center">
 
 Once a passcode is entered, we can click on `Encrypt Folder` and begin encrypting the entire folder. It is that simple! EVERY file in the folder will be encrypted, even those within subfolders. The names of the subfolders remain the same though.
 
 <p align="center">
-  <img src="python/readme/beginEncryption.png
+  <img src="readme/beginEncryption.png
   " alt="Beginning encryption">
 <p align="center">
 
@@ -63,13 +67,13 @@ Once a passcode is entered, we can click on `Encrypt Folder` and begin encryptin
 Once all files within the folder are encrypted, the app turns from <b>green to blue</b>. The color difference is to differentiate normal folders and encrypted folders: app turns <b>green</b> if target folder is unencrypted and turns <b>blue</b> if target folder is encrypted.
 
 <p align="center">
-  <img src="python/readme/encryptedFiles.png" alt="Encrypted Files">
+  <img src="readme/encryptedFiles.png" alt="Encrypted Files">
 <p align="center">
 
 If we open the encrypted folder using the file explorer, we see that all of the filenames have turned into strings of random characters, appended with a .thth file extension. 
 
 <p align="center">
-  <img src="python/readme/encryptedFileExtension.png" alt="Encrypted file extensions">
+  <img src="readme/encryptedFileExtension.png" alt="Encrypted file extensions">
 <p align="center">
 
 The encrypted folder also contains a small additional .ththscrpt file to mark it as encrypted, but it does not show up in ThothCrypt. <b>DO NOT</b> delete this file or modify any of the encrypted files, as <b>any slight changes might render the encrypted files completely unrecoverable.</b> 
@@ -83,7 +87,7 @@ If you want the folder back, you can follow the same steps as before, type in th
 If you have an encrypted folder, but you only need to <u>gain access to a <b>single</b> file,</u> you can click on the `Translate` button, which will translate all of the encrypted filenames to their original names. You can now double click on one of the files, which would encrypt and run <u>ONLY</u> the file you selected and ignoring the rest, saving time.
 
 <p align="center">
-  <img src="python/readme/translated.png" alt="Translated Files">
+  <img src="readme/translated.png" alt="Translated Files">
 <p align="center">
 
 ### Saving Changes to an Encrypted File
@@ -91,16 +95,16 @@ If you have an encrypted folder, but you only need to <u>gain access to a <b>sin
 After gaining access to a single file like we mentioned earlier, you might want to make some changes and save them, such as adding paragraphs to a word document, editing photos... etc. In this case, in addition to saving progress inside the file itself, ThothCrypt will open a window to ask if you want to save your changes, and you <b>must</b> click on `Yes`. This is because for time-saving and memory fragility concerns, ThothCrypt <b>DOES NOT</b> automatically save changes to your file as it requires re-encryption and re-writing. For more info, visit <b>[How It Works](#how-it-works)</b>.
 
 <p align="center">
-  <img src="python/readme/saveChanges.png" alt="Saving changes">
+  <img src="readme/saveChanges.png" alt="Saving changes">
 <p align="center">
 
 ## Common Errors
-<b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. None that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
+<b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. Note that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
 
 <b>Folder already contains some encrypted/decrypted files:</b> The `Encrypt Folder`, `Decrypt Folder` and `Translate` buttons only work if EVERY file in the target folder is unencrypted or encrypted respectively. It does not work if the target folder is supposed to be encrypted, but contains some decrypted files or vice versa. For reference, an encrypted file is a file that has a string of random characters as names, followed by a `.thth` extension, and a folder that is supposed to be encrypted contains a file with the name of the folder as its name, followed by a `.ththscrpt` extension.
 
 <p align="center">
-  <img src="python/readme/alreadyContains.png" alt="File Already Contains... Error">
+  <img src="readme/alreadyContains.png" alt="File Already Contains... Error">
 <p align="center">
 
 ## Encryption Caveats
@@ -116,19 +120,31 @@ Using Python's Fernet encryption, the size of the file contents increase by abou
 ### Memory Wear and Tear
 The encryption process requires reading every single file in a folder, encrypting their contents, and writing all of those contents back into the same file locations. This may be a problem when using fragile memory mediums such as very old hard drives or SD Cards, as they may have slow or limited read/write cycles.
 
-## Extra Features
+## More Features
 
-### Renaming
-The `Rename` button renames files or folders. 
+### Rename File
+The `Rename` button renames files. 
 
 ### Running a File
 Upon selection of a file, you can double click it to run the file, just like you would on a file explorer. Double-clicking on a folder opens the folder in a file explorer. Right-clicking each item displays the full path of the object selected.
 
+### Open Button
+The `Open` button opens the target folder in your file explorer.
+
 ### Deleting a File
 Click the `Delete` button to remove a file. It can also remove entire folders and all of its contents.
 
+### Look In Folder
+Click on a folder and click this button to change the target folder to the selected folder.
+
 ### Translate Button
-Appearing only when the target folder is encrypted, this button translates the gibberish of the encrypted filenames into its original names. Passcode is required for this. In the translated mode, the filenames turn from blue to green. In this mode, you can rename or open the files as per normal. However, if you opened the file and have made changes to the file you want saved, you MUST click 'Yes' on the dialog box that shows up after the file is opened, as pointed out earlier.
+Appearing only when the target folder is encrypted, this button translates the gibberish of the encrypted filenames into its original names. A passcode is required for this. In the translated mode, the filenames turn from blue to green. In this mode, you can rename or open the files as per normal. However, if you opened the file and have made changes to the file you want saved, you MUST click 'Yes' on the dialog box that shows up after the file is opened, as pointed out earlier.
+
+### Forbidden Extensions - in Settings
+Create a list of file extensions that ThothCrypt will ignore when encrypting or decrypting.
+
+### Passcode Generator - in Settings
+Generates a secure 32-character passcode for you that includes lowercase/uppercase characters, numbers and symbols. It even has a function to save it as a `.txt` file onto your desktop.
 
 ## How it works
 

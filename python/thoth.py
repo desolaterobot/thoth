@@ -560,10 +560,11 @@ def fileSelected(event):
         globalCurrentlySelectedPath = globalTitlePathDict[dirlistbox.get(index)]
         if not isFile(globalCurrentlySelectedPath):
             lookInFolderButton.config(state='normal')
+            renameButton.config(state='disabled')
         else:
             lookInFolderButton.config(state='disabled')
+            renameButton.config(state='normal')
         deleteFileButton.config(state='normal')
-        renameButton.config(state='normal')
         print("Selected ", globalCurrentlySelectedPath)
 
 #start whatever file/folder is being selected from the listbox
@@ -580,7 +581,7 @@ def startFile(event):
             #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
             #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
             #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
-            name = storedpath.splitlines(sep='\\')[-1]
+            name = storedpath.split(sep='\\')[-1]
             if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
                 reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
             enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
@@ -635,7 +636,7 @@ lookInFolderButton = tk.Button(rightFrame, text='Look in Folder', font=('Microso
 lookInFolderButton.pack(padx=15, pady=(14, 4))
 deleteFileButton = tk.Button(rightFrame, text='Delete', font=('Microsoft Sans Serif', 13), command=deleteSelectedFile, state='disabled', fg='red')
 deleteFileButton.pack(padx=7, pady=(14, 4))
-renameButton = tk.Button(rightFrame, text='Rename', font=('Microsoft Sans Serif', 13), command=renameCurrentFile, state='disabled')
+renameButton = tk.Button(rightFrame, text='Rename File', font=('Microsoft Sans Serif', 13), command=renameCurrentFile, state='disabled')
 renameButton.pack(padx=7, pady=(14, 4))
 #then, pack the exclusive buttons into seperate frames.
 #when folder is normal, display normalButtonFrame

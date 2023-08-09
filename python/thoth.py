@@ -6,6 +6,7 @@ from tkinter import ttk
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
+from tkinter import PhotoImage
 import time
 import string
 import random
@@ -434,6 +435,7 @@ def openSettings():
         password = passGenBox.get()
         if not password:
             messagebox.showerror('No passcode generated', "No passcode generated, nothing is saved. Click on 'Generate And Enter' first.")
+            settingsWindow.destroy()
             return
         if globalCurrentDirectoryObject:
             addr = joinAddr(os.path.expanduser("~/Desktop"), f"{globalCurrentDirectoryObject.name}{num}.txt")
@@ -444,15 +446,25 @@ def openSettings():
 
         if not os.path.exists(addr):
             open(addr, 'w').write(password)
+            messagebox.showinfo('Passcode saved!', f'Passcode saved on your desktop: {name}\nHide it before someone finds it!')
+            settingsWindow.destroy()
         else:
             saveToDesktop(num+1)
-        messagebox.showinfo('Passcode saved!', f'Passcode saved on your desktop: {name}\nHide it before someone finds it!')
 
     settingsWindow = tk.Toplevel()
     settingsWindow.title('ThothCrypt Settings')
-    centerWindow(settingsWindow, 500, 500)
+    centerWindow(settingsWindow, 500, 550)
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
+    # image
+    imgPath = "python\\assets\\icon.png"
+    img = Image.open(imgPath).resize((100,100))
+    photo = ImageTk.PhotoImage(img)
+    image_label = tk.Label(settingsWindow, image=photo, bg=normalSideCol)
+    image_label.image = photo
+    image_label.pack(pady=10)
+    label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber}', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
+    label0.pack()
     #forbidden file extensions
     label1 = tk.Label(settingsWindow, text='Forbidden file extensions', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
     label1.pack(pady=(10,0))
@@ -564,13 +576,14 @@ def startFile(event):
             if isinstance(storedpath, Exception): #some error handling
                 messagebox.showerror('Error', f'Error decrypting file: {Exception}')
                 return
-            disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton))
+            disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton))
             #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
             #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
             #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
-            if messagebox.askyesno('File opened', "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
+            name = storedpath.splitlines(sep='\\')[-1]
+            if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
                 reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
-            enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton))
+            enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
             os.remove(storedpath)
             return
     index = dirlistbox.nearest(event.y)

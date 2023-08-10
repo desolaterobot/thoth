@@ -31,6 +31,44 @@ def generateKey(seed:str):
 def mdHash(seed:str)->str:
     return md5(seed.encode('utf-8')).hexdigest()
 
+def modifyByChunk(isEncrypting:bool, filePath:str, destinationFolder:str, key:bytes):
+    #!if decrypting... check if filepath ends with .thth, if not then do not modify.
+    if not isEncrypting:
+        if not filePath.endswith(".thth"):
+            return EncryptionException('File is not decryptable by Thoth.')
+
+    #if destinationFolder is not set to anything, make it the original folder.
+    if destinationFolder == None:
+        destinationFolder = filePath.removesuffix(filePath.split(sep='\\')[-1])
+
+    with open(filePath, 'rb') as file:
+        while True:
+            chunk = file.read(4096)
+            if not chunk:
+                break
+            else:
+                #modify one 4KB chunk of data
+                if isEncrypting:
+                    modified = Fernet(key).decrypt(chunk)
+                else:
+                    modified = Fernet(key).decrypt(chunk)
+                #modifiying file name
+                oldFileName = filePath.split(sep='\\')[-1]
+                newFileName = None
+                if isEncrypting:
+                    #!if encrypting, add the .thth extension before renaming
+                    try:
+                        newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
+                    except Exception as e:
+                        return e
+                else:
+                    #!if decrypting... remove the .thth extension first before reverting to original filename.
+                    newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+                newPath = filePath.replace(oldFileName, newFileName)
+                with open()
+                
+                
+
 #given a file path, and a key, encrypt the file.
 #returns the new path if successful, and returns an exception if unsuccessful
 #function makes use of .thth file extension to check whether or not a file has been encrypted by Thoth.
@@ -39,17 +77,13 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
     if not isEncrypting:
         if not filePath.endswith(".thth"):
             return EncryptionException('File is not decryptable by Thoth.')
-    
-    if os.path.getsize(filePath) >= 1024*1024*1024:
-        return EncryptionException('File is too large to be encryptable.')
-    
-    global globalCurrentFileBeingModified
-    globalCurrentFileBeingModified = filePath
-        
+
     #read and encrypt the contents of the file
     with open(filePath, 'rb') as file:
         data = file.read()
     modified = None
+
+    #encrypt the data
     if isEncrypting:
         try:
             modified = Fernet(key).encrypt(data)
@@ -60,6 +94,7 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
             modified = Fernet(key).decrypt(data)
         except Exception as e:
             return e
+    
     #then write back to it.
     with open(filePath, 'wb') as encrypted_file:
         encrypted_file.write(modified)

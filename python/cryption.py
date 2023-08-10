@@ -40,6 +40,9 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
         if not filePath.endswith(".thth"):
             return EncryptionException('File is not decryptable by Thoth.')
     
+    if os.path.getsize(filePath) >= 1024*1024*1024:
+        return EncryptionException('File is too large to be encryptable.')
+    
     global globalCurrentFileBeingModified
     globalCurrentFileBeingModified = filePath
         

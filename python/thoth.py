@@ -27,7 +27,7 @@ def checkPass():
     #!check if the given key is correct by checking if the md5 hash of the given key matches the hash in thoth script.
     givenHash = eval(open(joinAddr(globalCurrentDirectoryObject.path, f"{globalCurrentDirectoryObject.name}.ththscrpt"), "r").read())['hash']
     key = generateKey(passBox.get())
-    hashKey = mdHash(key.decode())
+    hashKey = sha256(key.decode())
     if hashKey != givenHash:
         global globalWrongTries
         globalWrongTries += 1
@@ -279,7 +279,7 @@ def startModification(isEncrypting:bool):
         thothInfo = {
             "hash" : None
         }
-        thothInfo['hash'] = mdHash(key.decode())
+        thothInfo['hash'] = sha256(key.decode())
 
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=300, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
@@ -292,7 +292,7 @@ def startModification(isEncrypting:bool):
         for filePath in fileList:
             message = f"Now {'encrypting:' if isEncrypting else 'decrypting:'}\n{filePath}\n({sizeToString(os.path.getsize(filePath))}) Progress:{encryptionProgress}/{totalFileNum}"
             progressBar['value'] += piece
-            e = modifyFile(isEncrypting, filePath, key)
+            e = modifyByChunk(filePath, key)
             print(message)
             textBox.config(text=message)
             if isinstance(e, Exception):
@@ -315,7 +315,7 @@ def startModification(isEncrypting:bool):
             for folderPath in folderList:
                 name = folderPath.split(sep='\\')[-1]
                 folderScriptPath = joinAddr(folderPath, f"{name}.ththscrpt")
-                if mdHash(key.decode()) == eval(open(folderScriptPath, 'r').read())['hash']:
+                if sha256(key.decode()) == eval(open(folderScriptPath, 'r').read())['hash']:
                     #the hash inside this script matches the hash of the passcode given.
                     os.remove(folderScriptPath)
 

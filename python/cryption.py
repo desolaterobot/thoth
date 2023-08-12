@@ -6,8 +6,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
-from hashlib import md5
+import hashlib
 import tkinter as tk
+from math import ceil
 
 globalCurrentFileBeingModified = ""
 
@@ -27,56 +28,57 @@ def generateKey(seed:str):
     )
     return base64.urlsafe_b64encode(kdf.derive(seed_bytes))
 
+#generates a hash from a seed using sha256 algorithm
+def sha256(seed:str)->str:
+    return hashlib.sha256(seed.encode()).hexdigest()
+
 #generates a hash from a seed using md5 algorithm
 def mdHash(seed:str)->str:
-    return md5(seed.encode('utf-8')).hexdigest()
+    return hashlib.md5(seed.encode('utf-8')).hexdigest()
 
-def numberOfChunks(folderPath:str, chunkSize:int=1024*64):
+CHUNKSIZE = 1024*256
+
+def numberOfChunks(folderPath:str, chunkSize:int = CHUNKSIZE):
     size = os.path.getsize(folderPath)
-    return size // chunkSize
+    return ceil(size / chunkSize)
 
-#improved modification function, not memory intensive but slower and storage intensive.
-def modifyByChunk(isEncrypting:bool, filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = 1024*64):
-    #!if decrypting... check if filepath ends with .thth, if not then do not modify.
-    if not isEncrypting:
-        if not filePath.endswith(".thth"):
-            return EncryptionException('File is not decryptable by Thoth.')
-    
+#improved modification function, not memory intensive but slower and storage intensive. reccommended for very large files
+def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
+    isEncrypting = not filePath.endswith('.thth')
+    oldFileName = filePath.split(sep='\\')[-1]
     #if destinationFolder is not set to anything, make it the original folder.
     if destinationFolder == None:
-        destinationFolder = filePath.removesuffix('\\' + filePath.split(sep='\\')[-1])
+        destinationFolder = filePath.removesuffix('\\' + oldFileName)
 
-    #modifiying file name
-    oldFileName = filePath.split(sep='\\')[-1]
     if isEncrypting:
-        #!if encrypting, add the .thth extension before renaming
-        try:
-            newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
-        except Exception as e:
-            return e
+        name = Fernet(key).encrypt(oldFileName.encode()).decode()
+        newFileName = name + ".thth"
     else:
-        #!if decrypting... remove the .thth extension first before reverting to original filename.
         newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
 
     #forming new destination path
     newFilePath = destinationFolder + "\\" + newFileName
 
     #open both files, then start transferring data from old file to new file, encrypting data in the process
-    with open(filePath, 'rb') as oldFile:
-        newFile = open(newFilePath, 'ab')
-        while True:
-            chunk = oldFile.read(chunkSize)
-            if not chunk:
-                break
-            else:
-                #modify one 4KB chunk of data
-                if isEncrypting:
+    with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
+        if isEncrypting:
+            while True:
+                chunk = oldFile.read(chunkSize) #during encryption, each chunk size to be read is fixed, however, encrypted chunks have differring file sizes so we store those sizes first
+                if not chunk:
+                    break
+                else:
                     modified = Fernet(key).encrypt(chunk)
+                    newFile.write(modified)
+        else:
+            #with open(sizeListFilePath, 'r') as sizeListFile:
+            #    sizeList = [int(number) for number in sizeListFile.read().splitlines()]
+            while True:
+                chunk = oldFile.read(349624)
+                if not chunk:
+                    break
                 else:
                     modified = Fernet(key).decrypt(chunk)
-                #append modified file into the new file path.
-                newFile.write(modified)
-        newFile.close()
+                    newFile.write(modified)
 
     #now that all our data is in the new file, delete the old file.
     os.remove(filePath)
@@ -182,9 +184,3 @@ def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
         return e
     with open(resultPath, 'wb') as encrypted_file:
         encrypted_file.write(modified)
-
-inp = input('enter a file path: ')
-print(numberOfChunks(inp), '64KB chunks')
-print(os.path.getsize(inp))
-path = modifyByChunk(isEncrypting=True, filePath=inp, key=generateKey('dimas'))
-print(os.path.getsize(path))

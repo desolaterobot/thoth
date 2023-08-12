@@ -47,8 +47,8 @@ class File:
             print(f"Error deleting file: {e}")
     def getSize(self):
         return os.path.getsize(self.path)
-    def modify(self, isEncrypting:bool, key:bytes):
-        return modifyFile(isEncrypting, self.path, key)
+    def modify(self, key:bytes):
+        return modifyByChunk(self.path, key)
 
 class Directory:
     def __init__(self, parent:str, itemName:str):

@@ -272,10 +272,12 @@ def startModification(isEncrypting:bool):
         #get list of folders and subfolders.
         folderList = globalCurrentDirectoryObject.getCompleteFolderPathList()
         thisPath = globalCurrentDirectoryObject.path
-        thisName = globalCurrentDirectoryObject.name
         folderList.append(thisPath)
         totalFileNum = len(fileList)
-        encryptionProgress = 1
+        encryptionProgress = 0
+        chunkNumberFolder = globalCurrentDirectoryObject.getSize() / (CHUNKSIZE if isEncrypting else 349624)
+        piece = (100/chunkNumberFolder)
+        print(piece)
         thothInfo = {
             "hash" : None
         }
@@ -283,24 +285,68 @@ def startModification(isEncrypting:bool):
 
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=300, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
-            
+        
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
 
+        #?I HAVE TO PUT THE NEW MODIFY FUNCTION HERE SO THAT IT UPDATES THE TKINTER WINDOW!!!!!!!!!! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA WHYYYYYYYYYYYYYYYYYYYYYYYYYY
+        def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
+            currentFileEncryptionProgress = 0
+            currentFileEncryptionTotal = numberOfChunks(filePath)
+            isEncrypting = not filePath.endswith('.thth')
+            oldFileName = filePath.split(sep='\\')[-1]
+            #if destinationFolder is not set to anything, make it the original folder.
+            if destinationFolder == None:
+                destinationFolder = filePath.removesuffix('\\' + oldFileName)
+
+            if isEncrypting:
+                name = Fernet(key).encrypt(oldFileName.encode()).decode()
+                newFileName = name + ".thth"
+            else:
+                newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+
+            #forming new destination path
+            newFilePath = destinationFolder + "\\" + newFileName
+
+            #open both files, then start transferring data from old file to new file, encrypting data in the process
+            with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
+                print(f'currently modifying {filePath}')
+                while True:
+                    if isEncrypting:
+                        chunk = oldFile.read(chunkSize) 
+                        if not chunk:
+                            break
+                        else:
+                            modified = Fernet(key).encrypt(chunk)
+                            newFile.write(modified)
+                    else:
+                        chunk = oldFile.read(349624)
+                        if not chunk:
+                            break
+                        else:
+                            modified = Fernet(key).decrypt(chunk)
+                            newFile.write(modified)
+                    currentFileEncryptionProgress += 1
+                    globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+                    message = f"{'Now Encrypting:' if isEncrypting else 'Decrypting:'}\n{filePath}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {globalCurrentEncryptionPercentage}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
+                    textBox.config(text=message)
+                    progressBar['value'] += piece
+                    root.update()
+                    
+            #now that all our data is in the new file, delete the old file.
+            os.remove(filePath)
+            return newFilePath
+        
         startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////``
         failures = []
-        piece = (100 / totalFileNum)
         for filePath in fileList:
-            message = f"Now {'encrypting:' if isEncrypting else 'decrypting:'}\n{filePath}\n({sizeToString(os.path.getsize(filePath))}) Progress:{encryptionProgress}/{totalFileNum}"
-            progressBar['value'] += piece
             e = modifyByChunk(filePath, key)
-            print(message)
-            textBox.config(text=message)
             if isinstance(e, Exception):
                 failures.append(filePath)
-            root.update()
             encryptionProgress += 1
+            root.update()
         endTime = time.time() #*END OF MODIFICATION PROCESS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         
+        progressBar['value'] = 0
         root.update()
         piece = (100 / len(folderList))
 
@@ -310,15 +356,23 @@ def startModification(isEncrypting:bool):
                 textBox.config(text=f"Placing folder data...\n{folderPath}")
                 name = folderPath.split(sep='\\')[-1]
                 open(joinAddr(folderPath, f"{name}.ththscrpt"), "w").write(str(thothInfo))
+                progressBar['value'] += piece
+                root.update()
         else:
             #!after decryption... we remove the .ththscrpt file entirely in each subfolder, to show that the folder is normal.
             for folderPath in folderList:
+                textBox.config(text=f"Removing folder data...\n{folderPath}")
                 name = folderPath.split(sep='\\')[-1]
                 folderScriptPath = joinAddr(folderPath, f"{name}.ththscrpt")
                 if sha256(key.decode()) == eval(open(folderScriptPath, 'r').read())['hash']:
                     #the hash inside this script matches the hash of the passcode given.
                     os.remove(folderScriptPath)
+                progressBar['value'] += piece
+                root.update()
 
+        textBox.config(text=f"Refreshing...")
+        progressBar.pack_forget()
+        root.update()
         globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
         enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
         refreshListBox(None, currentDirectory) #update listbox
@@ -329,7 +383,7 @@ def startModification(isEncrypting:bool):
                 failureList = failureList + '\n' + file
             messagebox.showwarning('Some files failed to be modified', f'Please check on the state of these files:\n{failureList}')
         modWindow.destroy()
-    
+
     global globalCurrentDirectoryObject
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
@@ -339,7 +393,7 @@ def startModification(isEncrypting:bool):
             return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 125)
+    centerWindow(modWindow, 500, 150)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
     textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Microsoft Sans Serif', 12))
     textBox.pack(padx=5, pady=(5, 5))
@@ -570,22 +624,21 @@ def fileSelected(event):
 #start whatever file/folder is being selected from the listbox
 def startFile(event):
     global globalCurrentlySelectedPath
+    global globalCurrentDirectoryObject
     path = globalCurrentlySelectedPath
     if globalIsTranslatedBoolean and isFile(path):
         if checkPass():
-            storedpath = decryptSingleFile(path, generateKey(passBox.get()))
+            storedpath = modifyByChunk(path, generateKey(passBox.get()), destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True)
+            os.system(f'start "" "{storedpath}"')
             if isinstance(storedpath, Exception): #some error handling
                 messagebox.showerror('Error', f'Error decrypting file: {Exception}')
                 return
             disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton))
-            #at this moment, data is being stored in an internal folder in the computer. if user makes any changes to this file, ask if they want to save these changes into encryption folder.
-            #the reason why this happens is to reduce time taken, by skipping re-encryption after user is done with the file, whereever necessary.
-            #also useful with reducing read/write wear and tear if user stores encrypted data on a sensitive memory device, such as SD Cards, old HDD's
             name = storedpath.split(sep='\\')[-1]
             if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
-                reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
+                #reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
+                modifyByChunk(storedpath, generateKey(passBox.get()), destinationFolder=path.removesuffix('\\'+path.split(sep='\\')[-1]))
             enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
-            os.remove(storedpath)
             return
     index = dirlistbox.nearest(event.y)
     if index < 0:

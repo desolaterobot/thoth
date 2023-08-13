@@ -38,12 +38,18 @@ def mdHash(seed:str)->str:
 
 CHUNKSIZE = 1024*256
 
-def numberOfChunks(folderPath:str, chunkSize:int = CHUNKSIZE):
-    size = os.path.getsize(folderPath)
+def numberOfChunks(path:str, chunkSize:int = CHUNKSIZE):
+    size = os.path.getsize(path)
     return ceil(size / chunkSize)
 
-#improved modification function, not memory intensive but slower and storage intensive. reccommended for very large files
-def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
+globalCurrentEncryptionPercentage = 0
+
+#improved modification function, not memory intensive but slower and storage intensive. supports all file sizes and provides progress
+def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE, makeCopy:bool = False):
+    global globalCurrentEncryptionPercentage
+    globalCurrentEncryptionPercentage = 0
+    currentFileEncryptionProgress = 0
+    currentFileEncryptionTotal = numberOfChunks(filePath)
     isEncrypting = not filePath.endswith('.thth')
     oldFileName = filePath.split(sep='\\')[-1]
     #if destinationFolder is not set to anything, make it the original folder.
@@ -61,32 +67,35 @@ def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSi
 
     #open both files, then start transferring data from old file to new file, encrypting data in the process
     with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
-        if isEncrypting:
-            while True:
-                chunk = oldFile.read(chunkSize) #during encryption, each chunk size to be read is fixed, however, encrypted chunks have differring file sizes so we store those sizes first
+        print(f'currently modifying {filePath}')
+        while True:
+            if isEncrypting:
+                chunk = oldFile.read(chunkSize) 
                 if not chunk:
                     break
                 else:
                     modified = Fernet(key).encrypt(chunk)
                     newFile.write(modified)
-        else:
-            #with open(sizeListFilePath, 'r') as sizeListFile:
-            #    sizeList = [int(number) for number in sizeListFile.read().splitlines()]
-            while True:
+            else:
                 chunk = oldFile.read(349624)
                 if not chunk:
                     break
                 else:
                     modified = Fernet(key).decrypt(chunk)
                     newFile.write(modified)
+            currentFileEncryptionProgress += 1
+            globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+            print(f'modification progress: {globalCurrentEncryptionPercentage}%')
 
     #now that all our data is in the new file, delete the old file.
-    os.remove(filePath)
+    if not makeCopy:
+        os.remove(filePath)
     return newFilePath
 
-#given a file path, and a key, encrypt the file.
-#returns the new path if successful, and returns an exception if unsuccessful
-#function makes use of .thth file extension to check whether or not a file has been encrypted by Thoth.
+#? EVERYTHING BELOW IS NOT USED ANYMORE /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+"""
+#given a file path, and a key, encrypt the file. #? DOES NOT SUPPORT VERY LARGE FILES, REPLACED BY MODIFYBYCHUNK
 def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
 
     #!if decrypting... check if filepath ends with .thth, if not then do not modify.
@@ -136,7 +145,7 @@ def modifyFile(isEncrypting:bool, filePath:str, key:bytes):
         return e
     return newPath
 
-#decrypt a single file, place it into a directory on the computer temporarily, then run it.
+#decrypt a single file, place it into a directory on the computer temporarily, then run it. #?REPLACED BY MODIFYBYCHUNK
 def decryptSingleFile(filePath:str, key:bytes):
 
     #check if filepath ends with .thth, anything that doesn't will not be decrypted.
@@ -171,9 +180,7 @@ def decryptSingleFile(filePath:str, key:bytes):
     os.system(f'start "" "{tempPath}"')
     return tempPath
 
-def compareFileContents(path1:str, path2:str)->bool:
-    return open(path1, 'rb').read() == open(path2, 'rb').read()
-
+#only to be run if data is saved. #?REPLACED BY MODIFYBYCHUNK
 def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
     with open(tempPath, 'rb') as file:
         data = file.read() #data contains bytes data of the 
@@ -184,3 +191,4 @@ def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
         return e
     with open(resultPath, 'wb') as encrypted_file:
         encrypted_file.write(modified)
+"""

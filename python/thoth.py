@@ -110,7 +110,7 @@ def enableWidgets(widgetTuple:tuple):
 
 globalTotalFilesFound = 0
 
-def progressWindow(title:str='', labelText:str='', size:tuple=(500,150)):
+def progressWindow(title:str='', labelText:str='', size:tuple=(500,125)):
     window = tk.Toplevel(root)
     centerWindow(window, size[0], size[1])
     window.title(title)
@@ -131,8 +131,6 @@ def topWindow(title:str='', labelText:str='', size:tuple=(500,150)):
 # function is RECURSIVE! 
 def showDirectory(e, directory:str, nestvalue:int=0):
     global globalCurrentDirectoryObject
-    statusLabel.config(text=f'Searching target folder... be back in a bit.')
-    root.update()
     targetDirectory = path2Dir(directory)
     fileCount = 0
     dirCount = 0
@@ -151,7 +149,7 @@ def showDirectory(e, directory:str, nestvalue:int=0):
             appendListBox(dirlistbox, title)
             globalTitlePathDict[title] = item.path
             showDirectory(None, item.path, nestvalue + 1)
-        statusLabel.config(text=f'Listing target folder... {globalTotalFilesFound} files listed so far.')
+        statusLabel.config(text=f'Showing target folder... {globalTotalFilesFound} files listed so far.')
         root.update()
     globalCurrentDirectoryObject = targetDirectory
     return targetDirectory
@@ -163,9 +161,10 @@ def showStatus(directory):
         name = directory.name
         dircount = directory.totalDirCount
         filecount = directory.totalFileCount
-        completefilecount = len(directory.getCompleteFilePathList())
+        completefilecount = directory.getCompleteFileCount()
         statusLabel.config(text=f'{name} has {filecount} files, {dircount} subfolders. Including subfolders, {completefilecount} files with total size {size}')
         showRightFrame(not directory.isEncrypted)
+
     global globalTotalFilesFound
     globalTotalFilesFound = 0
     global globalIsTranslatedBoolean
@@ -174,12 +173,14 @@ def showStatus(directory):
     dirBox.insert(0, directory)
     disableWidgets((dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton))
     startTime = time.time()
+    statusLabel.config(text=f'Searching target folder... you seem to have a lot of files here...')
+    root.update()
     changeStatusLabel(showDirectory(None, directory))
     endTime = time.time()
     enableWidgets((dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton))
     #apparently '.3g' is the 3sf specifier????
     statusLabel2.config(text=f'Time taken to walk through {directory}: {(endTime-startTime):.3g} seconds.', fg='white')
-    #change listbox color based on if file is encrypted or not.s
+    #change listbox color based on if file is encrypted or not.
     if globalCurrentDirectoryObject.isEncrypted: #this is going on r/programminghorror for sure
         dirlistbox.config(bg=encrListCol, fg=blueTextColor, selectbackground=blueTextColor, selectforeground=encrListCol)
         leftFrame.config(bg=encrBGCol)
@@ -259,35 +260,15 @@ def lookInFolder():
 #the folder encryption function here is non-recursive, unlike the object method modifyDirectory()
 def startModification(isEncrypting:bool):
     def start():
+        global globalCurrentDirectoryObject
         modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
         encryptButton.pack_forget()
-        textBox.config(text='\nIt seems like modification cannot start for some reason.\nRefreshing and trying again...')
+        textBox.config(text='\nModification cannot start for some reason. Refresh and try again.')
         #encryption steps: modification, update current directory, update the list box.
         key = generateKey(passBox.get())
-        global globalCurrentDirectoryObject
         currentDirectory = globalCurrentDirectoryObject.path
 
         #*BEFORE FOLDER MODIFICATION, MAKE SOME CHECKS////////////////////////////////////////////////////////////////////////////////////////////////
-        
-        #getting the complete list of filepaths.
-        try:
-            fileList = globalCurrentDirectoryObject.getCompleteFilePathList()
-        except:
-            #error getting list
-            showDirectory(None, dirBox.get())
-            start()
-        
-        #check if the folder is COMPLETELY encrypted or unencrypted.
-        for file in fileList:
-            if globalCurrentDirectoryObject.isEncrypted:
-                if not file.endswith('.thth'):
-                    messagebox.showerror('Folder contains some unencrypted files.', 'The folder marked for decryption already contains unencrypted files. Look into the folder which contains them and delete/encrypt them first.')
-                    return
-            else:
-                if file.endswith('.thth'):
-                    modWindow.destroy()
-                    messagebox.showerror('Folder contains some encrypted files.', 'The folder marked for encryption already contains some encrypted files. Look into the folder which contains them and delete/decrypt them first.')
-                    return
             
         #get list of folders and subfolders.
         folderList = globalCurrentDirectoryObject.getCompleteFolderPathList()
@@ -295,9 +276,13 @@ def startModification(isEncrypting:bool):
         folderList.append(thisPath)
         totalFileNum = len(fileList)
         encryptionProgress = 0
-        chunkNumberFolder = globalCurrentDirectoryObject.getSize() / (CHUNKSIZE if isEncrypting else 349624)
+        print('size of folder', sizeToString(globalCurrentDirectoryObject.getSize()))
+        chunkNumberFolder = 0
+        for file in globalCurrentDirectoryObject.getCompleteFilePathList():
+            chunkNumberFolder += ceil(os.path.getsize(file) / (CHUNKSIZE if isEncrypting else 349624))
         piece = (100/chunkNumberFolder)
-        print(piece)
+        print(chunkNumberFolder, 'chunks total')
+        print('piece: ', piece)
         thothInfo = {
             "hash" : None
         }
@@ -306,9 +291,9 @@ def startModification(isEncrypting:bool):
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=300, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
         
-        disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
-
-        #?I HAVE TO PUT THE NEW MODIFY FUNCTION HERE SO THAT IT UPDATES THE TKINTER WINDOW!!!!!!!!!! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA WHYYYYYYYYYYYYYYYYYYYYYYYYYY
+        disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
+        
+        #? i'm sorry, there were some changes i want to make here
         def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
             currentFileEncryptionProgress = 0
             currentFileEncryptionTotal = numberOfChunks(filePath)
@@ -350,6 +335,7 @@ def startModification(isEncrypting:bool):
                     message = f"{'Now Encrypting:' if isEncrypting else 'Decrypting:'}\n{filePath}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {globalCurrentEncryptionPercentage}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
                     textBox.config(text=message)
                     progressBar['value'] += piece
+                    print(progressBar['value'])
                     root.update()
                     
             #now that all our data is in the new file, delete the old file.
@@ -394,7 +380,7 @@ def startModification(isEncrypting:bool):
         progressBar.pack_forget()
         root.update()
         globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
-        enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton))
+        enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         refreshListBox(None, currentDirectory) #update listbox
         statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {(endTime-startTime):.3g} seconds. {len(failures)} failures.", fg='white')
         if failures:
@@ -403,8 +389,27 @@ def startModification(isEncrypting:bool):
                 failureList = failureList + '\n' + file
             messagebox.showwarning('Some files failed to be modified', f'Please check on the state of these files:\n{failureList}')
         modWindow.destroy()
-
     global globalCurrentDirectoryObject
+    #check if the folder is COMPLETELY encrypted or unencrypted.
+    #getting the complete list of filepaths.
+    try:
+        fileList = globalCurrentDirectoryObject.getCompleteFilePathList()
+    except:
+        #error getting list
+        showDirectory(None, dirBox.get())
+        start()
+
+    for file in fileList:
+        folder = file.removesuffix('\\' + file.split(sep='\\')[-1])
+        if globalCurrentDirectoryObject.isEncrypted:
+            if not file.endswith('.thth'):
+                messagebox.showerror('Folder is not fully encrypted.', f'Unencrypted files are found at {folder}. Please look into this folder and delete or encrypt these files first.')
+                return
+        else:
+            if file.endswith('.thth'):
+                messagebox.showerror('Folder is not fully decrypted.', f'Encrypted files are found at {folder}. Please look into this folder and delete or decrypt these files first.')
+                return
+            
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
         return 
@@ -578,12 +583,13 @@ def addFilesIntoEncryptedFolder():
     fileList = [item.replace('/', '\\') for item in fileList]
     key = generateKey(passBox.get())
     window, label, bar = progressWindow(f'Encrypting and adding files into {globalCurrentDirectoryObject.name}...')
-    filecount = 1
+    filecount = 0
     for file in fileList:
-        filename = file.removesuffix(file.split(sep="\\")[-1])
+        filename = file.split(sep="\\")[-1]
         label.config(text=f'Encrypting\n{filename}\n({filecount}/{len(fileList)})')
         modifyByChunk(file, key, globalCurrentDirectoryObject.path, progressBar=bar, root=root)
         bar['value'] = 0
+        filecount+=1
     window.destroy()
     refreshListBox(None, globalCurrentDirectoryObject.path)
 
@@ -670,16 +676,20 @@ def startFile(event):
     key = generateKey(passBox.get())
     if globalIsTranslatedBoolean and isFile(path):
         if checkPass():
-            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True)
+            name = Fernet(key).decrypt(path.split(sep='\\')[-1].removesuffix('.thth').encode()).decode()
+            window, label, progress = progressWindow(f'Opening {name}...')
+            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True, progressBar=progress, label=label, root=root)
+            window.destroy()
             os.system(f'start "" "{storedpath}"')
-            if isinstance(storedpath, Exception): #some error handling
+            if isinstance(storedpath, Exception): #some error handling i guess
                 messagebox.showerror('Error', f'Error decrypting file: {Exception}')
                 return
             disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton))
             name = storedpath.split(sep='\\')[-1]
             if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
-                #modifyByChunk(storedpath, key, destinationFolder=path.removesuffix('\\'+path.split(sep='\\')[-1]))
-                reEncryptSingleFile(storedpath, path, key)
+                window, label, progress = progressWindow(f'Saving {name}...')
+                reEncryptSingleFile(storedpath, path, key, label=label, progressBar=progress, root=root)
+                window.destroy()
             os.remove(storedpath)
             enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
             return
@@ -742,11 +752,11 @@ encryptFolderButton.pack(padx=15, pady=(14, 4))
 #when folder is encrypted, display encrButtonFrame
 encrButtonFrame = tk.Frame(rightFrame, bg=encrSideCol)
 translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Microsoft Sans Serif', 13), command=translateListBox)
-translateFolderButton.pack(padx=15, pady=(15, 7))
+translateFolderButton.pack(padx=15, pady=(14, 4))
 addFilesButton = tk.Button(encrButtonFrame, text='Add Files', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
-addFilesButton.pack(padx=15, pady=(15, 7))
+addFilesButton.pack(padx=15, pady=(14, 4))
 decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
-decryptFolderButton.pack(padx=15, pady=7)
+decryptFolderButton.pack(padx=15, pady=(14, 4))
 
 leftFrame.grid(column=0, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
 scrollbar.grid(column=1, row=0, sticky=tk.N+tk.S+tk.E+tk.W)

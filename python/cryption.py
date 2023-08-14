@@ -98,9 +98,10 @@ def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCop
     return newFilePath
 
 #transfer file data from the temporary file to the encrypted file.
-def reEncryptSingleFile(tempFilePath:str, encryptedFilePath:str, key:bytes, label:tk.Label=None, progressBar:ttk.Progressbar=None):
+def reEncryptSingleFile(tempFilePath:str, encryptedFilePath:str, key:bytes, label:tk.Label=None, progressBar:ttk.Progressbar=None, root:tk.Tk=None):
     currentFileEncryptionTotal = numberOfChunks(tempFilePath)
     piece = 100 / currentFileEncryptionTotal
+    currentFileEncryptionProgress = 0
     with open(encryptedFilePath, 'w') as file:
         pass #empty the encrypted file first, so that we can properly append chunks of data to it.
     with open(tempFilePath, 'rb') as oldFile, open(encryptedFilePath, 'ab') as newFile:
@@ -117,6 +118,7 @@ def reEncryptSingleFile(tempFilePath:str, encryptedFilePath:str, key:bytes, labe
                 label.config(text=f"Re-encrypting file:\n{tempFilePath}\n{encryptionPercentage}%")
             if progressBar:
                 progressBar['value'] += piece
+            root.update()
 
 #? EVERYTHING BELOW IS NOT USED ANYMORE /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

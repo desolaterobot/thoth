@@ -60,23 +60,28 @@ class Directory:
         self.isEncrypted = False
         totalFileCount = 0
         totalDirCount = 0
-        try:
-            for item in os.listdir(self.path):
-                fileAddr = joinAddr(self.path, item)
-                #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
-                if fileAddr.endswith('.ththscrpt'):
-                    self.isEncrypted = True
-                if not isAllowed(fileAddr):
-                    continue #ignore if given fileaddr is not allowed
-                if isFile(fileAddr):
-                    self.contents.append(File(self.path, item))
-                    totalFileCount+=1
-                else:
-                    addeddir = Directory(self.path, item)
-                    self.contents.append(addeddir)
-                    totalDirCount+=1
-        except:
-            print(f"UNABLE TO ACCESS FOLDER WITH PATH: {self.path}")
+
+        if not (os.access(self.path, os.R_OK) and os.access(self.path, os.W_OK) and os.access(self.path, os.X_OK)):
+            print(f"CANNOT ACCESS {self.path}")
+            return
+
+        for item in os.listdir(self.path):
+            fileAddr = joinAddr(self.path, item)
+            #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
+            if fileAddr.endswith('.ththscrpt'):
+                self.isEncrypted = True
+            if fileAddr.endswith('.thth'):
+                self.containsEncryptedFiles = True
+            if not isAllowed(fileAddr):
+                continue #ignore if given fileaddr is not allowed
+            if isFile(fileAddr):
+                self.contents.append(File(self.path, item))
+                totalFileCount+=1
+            else:
+                addeddir = Directory(self.path, item)
+                self.contents.append(addeddir)
+                totalDirCount+=1
+        
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount
 
@@ -89,6 +94,8 @@ class Directory:
     
     #recursive approach of getting ONLY the COMPLETE filecount of the directory. nothing else, just the number
     def getCompleteFileCount(self)->int:
+        if hasattr(self, 'completeFilePathList'):
+            return len(self.completeFilePathList)
         def getCFC(directory: Directory):
             if directory.totalDirCount == 0:
                 return directory.totalFileCount
@@ -106,6 +113,8 @@ class Directory:
     
     #returns a list of the complete paths of every file within a directory, even within the subdirectories.
     def getCompleteFilePathList(self)->list:
+        if hasattr(self, 'completeFilePathList'):
+            return self.completeFilePathList
         def fileList(direct:Directory):
             files = list()
             for item in direct.contents:
@@ -117,11 +126,15 @@ class Directory:
                 else:
                     recursed = fileList(item)
                     files.extend(recursed)
-            return files    
-        return fileList(self)
+            return files
+        flist = fileList(self)
+        self.completeFilePathList = flist
+        return flist
 
     #returns a list of the complete paths of each subfolder inside the current folder.
     def getCompleteFolderPathList(self):
+        if hasattr(self, 'filePathList'):
+            return self.filePathList
         def folderlist(direct:Directory):
             folders = list()
             for item in direct.contents:
@@ -214,4 +227,5 @@ def path2Dir(path:str):
     p = path.split(sep='\\')
     name = p[-1]
     parentPath = path.removesuffix('\\' + name)
-    return Directory(parentPath, name)
+    direct =  Directory(parentPath, name)
+    return direct

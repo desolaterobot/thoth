@@ -8,6 +8,7 @@ import base64
 import os
 import hashlib
 import tkinter as tk
+from tkinter import ttk
 from math import ceil
 
 globalCurrentFileBeingModified = ""
@@ -37,17 +38,16 @@ def mdHash(seed:str)->str:
     return hashlib.md5(seed.encode('utf-8')).hexdigest()
 
 CHUNKSIZE = 1024*256
+ENCRCHUNKSIZE = 349624
 
-def numberOfChunks(path:str, chunkSize:int = CHUNKSIZE):
+def numberOfChunks(path:str):
     size = os.path.getsize(path)
-    return ceil(size / chunkSize)
-
-globalCurrentEncryptionPercentage = 0
+    if path.endswith('.thth'):
+        return ceil(size / ENCRCHUNKSIZE)
+    return ceil(size / CHUNKSIZE)
 
 #improved modification function, not memory intensive but slower and storage intensive. supports all file sizes and provides progress
-def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE, makeCopy:bool = False):
-    global globalCurrentEncryptionPercentage
-    globalCurrentEncryptionPercentage = 0
+def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCopy:bool = False, label:tk.Label=None, progressBar:ttk.Progressbar=None):
     currentFileEncryptionProgress = 0
     currentFileEncryptionTotal = numberOfChunks(filePath)
     isEncrypting = not filePath.endswith('.thth')
@@ -64,33 +64,57 @@ def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSi
 
     #forming new destination path
     newFilePath = destinationFolder + "\\" + newFileName
+    piece = 100 / currentFileEncryptionTotal
 
     #open both files, then start transferring data from old file to new file, encrypting data in the process
     with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
-        print(f'currently modifying {filePath}')
         while True:
             if isEncrypting:
-                chunk = oldFile.read(chunkSize) 
+                chunk = oldFile.read(CHUNKSIZE)
                 if not chunk:
                     break
                 else:
                     modified = Fernet(key).encrypt(chunk)
                     newFile.write(modified)
             else:
-                chunk = oldFile.read(349624)
+                chunk = oldFile.read(ENCRCHUNKSIZE)
                 if not chunk:
                     break
                 else:
                     modified = Fernet(key).decrypt(chunk)
                     newFile.write(modified)
             currentFileEncryptionProgress += 1
-            globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
-            print(f'modification progress: {globalCurrentEncryptionPercentage}%')
+            encryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+            if label:
+                label.config(text=f"{'Encrypting' if isEncrypting else 'Decrypting'} file:\n{filePath}\n{encryptionPercentage}%")
+            if progressBar:
+                progressBar['value'] += piece
 
     #now that all our data is in the new file, delete the old file.
     if not makeCopy:
         os.remove(filePath)
     return newFilePath
+
+#transfer file data from the temporary file to the encrypted file.
+def reEncryptSingleFile(tempFilePath:str, encryptedFilePath:str, key:bytes, label:tk.Label=None, progressBar:ttk.Progressbar=None):
+    currentFileEncryptionTotal = numberOfChunks(tempFilePath)
+    piece = 100 / currentFileEncryptionTotal
+    with open(encryptedFilePath, 'w') as file:
+        pass #empty the encrypted file first, so that we can properly append chunks of data to it.
+    with open(tempFilePath, 'rb') as oldFile, open(encryptedFilePath, 'ab') as newFile:
+        while True:
+            chunk = oldFile.read(CHUNKSIZE)
+            if not chunk:
+                break
+            else:
+                modified = Fernet(key).encrypt(chunk)
+                newFile.write(modified)
+            currentFileEncryptionProgress += 1
+            encryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+            if label:
+                label.config(text=f"Re-encrypting file:\n{tempFilePath}\n{encryptionPercentage}%")
+            if progressBar:
+                progressBar['value'] += piece
 
 #? EVERYTHING BELOW IS NOT USED ANYMORE /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -180,7 +204,7 @@ def decryptSingleFile(filePath:str, key:bytes):
     os.system(f'start "" "{tempPath}"')
     return tempPath
 
-#only to be run if data is saved. #?REPLACED BY MODIFYBYCHUNK
+#only to be run if data is saved. #?REDESIGNED FUNCTION
 def reEncryptSingleFile(tempPath:str, resultPath:str, key:bytes):
     with open(tempPath, 'rb') as file:
         data = file.read() #data contains bytes data of the 

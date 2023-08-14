@@ -13,7 +13,7 @@ import random
 
 # GLOBAL VARIABLES ######################################################################################
 
-globalVersionNumber = '1.0'
+globalVersionNumber = '1.1'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
@@ -136,8 +136,8 @@ def showDirectory(e, directory:str, nestvalue:int=0):
     globalCurrentDirectoryObject = targetDirectory
     return targetDirectory
 
-#display status of target file on the label text at the bottom
 def showStatus(directory):
+    #display status of target file on the label text at the bottom
     def changeStatusLabel(directory:Directory):
         size = sizeToString(directory.getSize())
         name = directory.name
@@ -546,6 +546,21 @@ def openSettings():
     generateButton = tk.Button(settingsWindow, text='Store In Desktop', font=('Microsoft Sans Serif', 13), command=saveToDesktop)
     generateButton.pack(pady=(5,5))
 
+def addFilesIntoEncryptedFolder():
+    if not checkPass():
+        return
+    messagebox.showinfo('Encrypt and add files', 'In the following window, select the files you want to encrypt and add into the target folder.')
+    fileList = list(filedialog.askopenfilenames(title='Select files to encrypt and add to target folder...'))
+    for file in fileList:
+        if file.endswith('.thth') or file.endswith('.ththscrpt'):
+            messagebox.showerror('File not allowed', '.thth and .ththscrpt files are not allowed to be selected.')
+            return
+    fileList = [item.replace('/', '\\') for item in fileList]
+    key = generateKey(passBox.get())
+    for file in fileList:
+        modifyByChunk(file, key, globalCurrentDirectoryObject.path)
+    refreshListBox(None, globalCurrentDirectoryObject.path)
+
 # GUI #######################################################################################################################################
 
 root = tk.Tk()
@@ -626,9 +641,10 @@ def startFile(event):
     global globalCurrentlySelectedPath
     global globalCurrentDirectoryObject
     path = globalCurrentlySelectedPath
+    key = generateKey(passBox.get())
     if globalIsTranslatedBoolean and isFile(path):
         if checkPass():
-            storedpath = modifyByChunk(path, generateKey(passBox.get()), destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True)
+            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True)
             os.system(f'start "" "{storedpath}"')
             if isinstance(storedpath, Exception): #some error handling
                 messagebox.showerror('Error', f'Error decrypting file: {Exception}')
@@ -636,8 +652,9 @@ def startFile(event):
             disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton))
             name = storedpath.split(sep='\\')[-1]
             if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
-                #reEncryptSingleFile(storedpath, path, generateKey(passBox.get())) #this is what we want to skip.
-                modifyByChunk(storedpath, generateKey(passBox.get()), destinationFolder=path.removesuffix('\\'+path.split(sep='\\')[-1]))
+                #modifyByChunk(storedpath, key, destinationFolder=path.removesuffix('\\'+path.split(sep='\\')[-1]))
+                reEncryptSingleFile(storedpath, path, key)
+            os.remove(storedpath)
             enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
             return
     index = dirlistbox.nearest(event.y)
@@ -700,6 +717,8 @@ encryptFolderButton.pack(padx=15, pady=(14, 4))
 encrButtonFrame = tk.Frame(rightFrame, bg=encrSideCol)
 translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Microsoft Sans Serif', 13), command=translateListBox)
 translateFolderButton.pack(padx=15, pady=(15, 7))
+addFilesButton = tk.Button(encrButtonFrame, text='Add Files', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
+addFilesButton.pack(padx=15, pady=(15, 7))
 decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
 decryptFolderButton.pack(padx=15, pady=7)
 

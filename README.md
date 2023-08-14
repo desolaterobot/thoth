@@ -15,7 +15,7 @@
 ### 1. [Getting Started](#getting-started)
 ### 2. [Common Errors](#common-errors)
 ### 3. [Downsides to Encryption](#caveats)
-### 4. [Extra Features](#extra-features)
+### 4. [More Features](#more-features)
 ### 5. [How It Works](#how-it-works)
 
 ## Getting Started
@@ -97,6 +97,9 @@ After gaining access to a single file like we mentioned earlier, you might want 
   <img src="readme/saveChanges.png" alt="Saving changes">
 <p align="center">
 
+### Adding files into an encrypted folder
+If you want to add unencrypted files into an encrypted folder, simply click on `Add Files` then select the unencrypted files. ThothCrypt will automatically encrypt those files and place them in the target folder. No need to decrypt everything, manually move the files and encrypt everything again. 
+
 ## Common Errors
 <b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. Note that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
 
@@ -136,6 +139,9 @@ Click the `Delete` button to remove a file. It can also remove entire folders an
 ### Look In Folder
 Click on a folder and click this button to change the target folder to the selected folder.
 
+### Add File
+Appears only when target folder is already encrypted, this button automatically brings up a file explorer to let you select files, which will be automatically be encrypted and moved to the target folder.
+
 ### Translate Button
 Appearing only when the target folder is encrypted, this button translates the gibberish of the encrypted filenames into its original names. A passcode is required for this. In the translated mode, the filenames turn from blue to green. In this mode, you can rename or open the files as per normal. However, if you opened the file and have made changes to the file you want saved, you MUST click 'Yes' on the dialog box that shows up after the file is opened, as pointed out earlier.
 
@@ -165,7 +171,7 @@ def fileList(direct:Directory): #root Directory
 ```
 In the aforementioned function, when the folder system is seen as a tree data structure with Files and Folders as nodes, the function traverses each branch, and backtracks to the last Folder when it sees a File. It stores the full path of every node on this tree. This process is called 'walking' through or looking through the folder, and could take some time depending on the number of files in the folder.
 
-### Modification
+### Modification using Fernet
 'Modifying' in this context refers to either encrypting or decrypting. ThothCrypt uses Fernet encryption, included in the Python cryptography library. Fernet uses a 32-byte key, to modify content. Anyone who has this key would be able to decrypt your encrypted files and read them.
 
 Since most of us are not expected to memorize a 32-byte (32 characters) passcode, ThothCrypt uses a hash function (SHA-256) that transforms any string into the 32-byte key that Fernet desires. This allows a more friendlier range of passcodes.
@@ -176,7 +182,21 @@ A hash function is a function that takes in an input string of any length and sp
 
 Hash functions are irreversible, so it is near impossible to trace the input string of the hash function, just by knowing the hash result. It is important to know that if very simple input strings are used, it is possible to bruteforce hash results given enough time. Hence, it is advised to choose a complex passcode, though we do not try to limit you here.
 
-### Modification of entire folders
+### Password Checking
+Folders can be encrypted and decrypted by using a single passcode and hashing the passcode into a usable key. However, Fernet does not have a built-in key checking function, which leads to problems if you misstype the passcode, leading to multiple keys and undesired behaviour:
+```python
+#what's supposed to happen:
+            key1                        key1
+normalFile -encryption-> encryptedFile -decryption-> normalFile
+```
+```python
+#what can happen if multiple passcodes are used to modify the same file:
+            key1                        key2
+normalFile -encryption-> encryptedFile -decryption-> undefinedFile
+```
+Hence we need to check that the passcode used for decryption is the same key used for encryption. We cannot store this passcode in the folder, or even in the PC Folders, as that would be a security risk. Hash functions come in handy here as well. During encryption, we hash the encryption key, then write it into a `.ththscrpt` file which will be placed inside the encryption folder. This way, when we decrypt, we shall check the hash of the key given for decryption against the hash inside of the `.ththscrpt` file, if both hashes are the same, this means that the key is the same as the key used for encryption, and decryption can proceed safely.
+
+### File Modification Methods 
 When a folder begins modification, it loops through every single filepath stored earlier from walking through the file, and reads each of the files contents. For each file, it feeds the file contents into the Fernet encryption function mentioned earlier in order to write back the encrypted contents into the same file: 
 
 ```python
@@ -208,19 +228,46 @@ newPath = oldFilePath.replace(oldFileName, newFileName)
 #rename the file.
 os.rename(oldFilePath, newPath)
 ```
-### Password Checking
-Folders can be encrypted and decrypted by using a single passcode and hashing the passcode into a usable key. However, Fernet does not have a built-in key checking function, which leads to problems if you misstype the passcode, leading to multiple keys and undesired behaviour:
+An issue with this file encryption method is that due to the line `data = file.read()`, ALL of the file data is exepected to be stored in memory, within the variable `data`. While this is okay for small files, huge files such as those more than 1GB, would sometimes be infeasible to store in memory, leading to encryption issues due to incomplete data in memory. This led to a chunk-by-chunk approach introduced in ThothCrypt 1.1:
+
+### Improved modification method
+The improved method for modification involves creating an empty file with the modified name first, then reading one chunk of data from the original file, encrypting only that chunk, then appending the modified chunk to the modified file. This repeats for every 256KB chunk that the original file takes up. Once all the chunks are encrypted and appended to the modified file, the original file can be deleted.
+
 ```python
-#what's supposed to happen:
-            key1                        key1
-normalFile -encryption-> encryptedFile -decryption-> normalFile
+CHUNKSIZE = 1024*256
+ENCRCHUNKSIZE = 349624
+
+#forming the modified file name and path
+if isEncrypting:
+    name = Fernet(key).encrypt(oldFileName.encode()).decode()
+    newFileName = name + ".thth"
+else:
+    newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+newFilePath = destinationFolder + "\\" + newFileName
+
+#create the new file, then modify chunk-by-chunk
+with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
+    while True:
+        if isEncrypting:
+            chunk = oldFile.read(CHUNKSIZE) 
+            if not chunk:
+                break
+            else:
+                modified = Fernet(key).encrypt(chunk)
+                newFile.write(modified)
+        else:
+            chunk = oldFile.read(ENCRCHUNKSIZE)
+            if not chunk:
+                break
+            else:
+                modified = Fernet(key).decrypt(chunk)
+                newFile.write(modified)
+
+#delete the original file.
+os.remove(filePath)
 ```
-```python
-#what can happen if multiple passcodes are used to modify the same file:
-            key1                        key2
-normalFile -encryption-> encryptedFile -decryption-> undefinedFile
-```
-Hence we need to check that the passcode used for decryption is the same key used for encryption. We cannot store this passcode in the folder, or even in the PC Folders, as that would be a security risk. Hash functions come in handy here as well. During encryption, we hash the encryption key, then write it into a `.ththscrpt` file which will be placed inside the encryption folder. This way, when we decrypt, we shall check the hash of the key given for decryption against the hash inside of the `.ththscrpt` file, if both hashes are the same, this means that the key is the same as the key used for encryption, and decryption can proceed safely.
+
+This method is slightly slower as it needs to seperate the contents of the original file into 256KB chunks and encrypting and writing it one-by-one. It is also storage-intensive, because at one point during encryption, you have 2 files that represent the same data simultaneously: the original file and the modified file. Only after modification will the original file be deleted. However, this enables larger files to be encrypted, such as videos and games, and also provides a smoother progress bar, as each modification session only works with a fixed size: 256KB for encryption and 349624B for decryption.
 
 ### Single file decryption: a hardware consideration
 In a folder of encrypted files, sometimes we only need just one. It would not be feasible to decrypt an entire folder just to acccess one file as it would be too time-consuming. Hence, we have a dedicated process that optimises exactly that, by writing into the encrypted folder only when necessary.

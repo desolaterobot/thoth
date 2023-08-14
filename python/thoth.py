@@ -110,15 +110,35 @@ def enableWidgets(widgetTuple:tuple):
 
 globalTotalFilesFound = 0
 
+def progressWindow(title:str='', labelText:str='', size:tuple=(500,150)):
+    window = tk.Toplevel(root)
+    centerWindow(window, size[0], size[1])
+    window.title(title)
+    textBox = tk.Label(window, text=labelText, font=('Microsoft Sans Serif', 12))
+    textBox.pack(padx=5, pady=(5, 5))
+    progressBar = ttk.Progressbar(window, orient='horizontal', length=300, mode='determinate')
+    progressBar.pack(padx=5, pady=(8, 8))
+    return window, textBox, progressBar
+
+def topWindow(title:str='', labelText:str='', size:tuple=(500,150)):
+    window = tk.Toplevel(root)
+    centerWindow(window, size[0], size[1])
+    window.title(title)
+    textBox = tk.Label(window, text=labelText, font=('Microsoft Sans Serif', 12))
+    textBox.pack(padx=5, pady=(5, 5))
+    return window, textBox
+
 # function is RECURSIVE! 
 def showDirectory(e, directory:str, nestvalue:int=0):
     global globalCurrentDirectoryObject
+    statusLabel.config(text=f'Searching target folder... be back in a bit.')
+    root.update()
     targetDirectory = path2Dir(directory)
     fileCount = 0
     dirCount = 0
     global globalTotalFilesFound
     for item in targetDirectory.contents:
-        statusLabel2.config(text=f'{item.name} discovered.')
+        statusLabel2.config(text=f'{item.name} listed.')
         if isinstance(item, File):
             globalTotalFilesFound += 1
             fileCount += 1
@@ -131,7 +151,7 @@ def showDirectory(e, directory:str, nestvalue:int=0):
             appendListBox(dirlistbox, title)
             globalTitlePathDict[title] = item.path
             showDirectory(None, item.path, nestvalue + 1)
-        statusLabel.config(text=f'Searching target folder... {globalTotalFilesFound} files found so far.')
+        statusLabel.config(text=f'Listing target folder... {globalTotalFilesFound} files listed so far.')
         root.update()
     globalCurrentDirectoryObject = targetDirectory
     return targetDirectory
@@ -557,8 +577,14 @@ def addFilesIntoEncryptedFolder():
             return
     fileList = [item.replace('/', '\\') for item in fileList]
     key = generateKey(passBox.get())
+    window, label, bar = progressWindow(f'Encrypting and adding files into {globalCurrentDirectoryObject.name}...')
+    filecount = 1
     for file in fileList:
-        modifyByChunk(file, key, globalCurrentDirectoryObject.path)
+        filename = file.removesuffix(file.split(sep="\\")[-1])
+        label.config(text=f'Encrypting\n{filename}\n({filecount}/{len(fileList)})')
+        modifyByChunk(file, key, globalCurrentDirectoryObject.path, progressBar=bar, root=root)
+        bar['value'] = 0
+    window.destroy()
     refreshListBox(None, globalCurrentDirectoryObject.path)
 
 # GUI #######################################################################################################################################

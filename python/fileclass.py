@@ -50,6 +50,8 @@ class File:
     def modify(self, key:bytes):
         return modifyByChunk(self.path, key)
 
+rootDirectoryFilePathList = []
+
 class Directory:
     def __init__(self, parent:str, itemName:str):
         self.name = itemName;

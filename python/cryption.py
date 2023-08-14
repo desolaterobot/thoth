@@ -47,7 +47,7 @@ def numberOfChunks(path:str):
     return ceil(size / CHUNKSIZE)
 
 #improved modification function, not memory intensive but slower and storage intensive. supports all file sizes and provides progress
-def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCopy:bool = False, label:tk.Label=None, progressBar:ttk.Progressbar=None):
+def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCopy:bool = False, label:tk.Label=None, progressBar:ttk.Progressbar=None, root:tk.Tk=None):
     currentFileEncryptionProgress = 0
     currentFileEncryptionTotal = numberOfChunks(filePath)
     isEncrypting = not filePath.endswith('.thth')
@@ -87,8 +87,10 @@ def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCop
             encryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
             if label:
                 label.config(text=f"{'Encrypting' if isEncrypting else 'Decrypting'} file:\n{filePath}\n{encryptionPercentage}%")
+                root.update()
             if progressBar:
                 progressBar['value'] += piece
+                root.update()
 
     #now that all our data is in the new file, delete the old file.
     if not makeCopy:

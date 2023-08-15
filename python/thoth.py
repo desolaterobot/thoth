@@ -276,13 +276,10 @@ def startModification(isEncrypting:bool):
         folderList.append(thisPath)
         totalFileNum = len(fileList)
         encryptionProgress = 0
-        print('size of folder', sizeToString(globalCurrentDirectoryObject.getSize()))
         chunkNumberFolder = 0
         for file in globalCurrentDirectoryObject.getCompleteFilePathList():
             chunkNumberFolder += ceil(os.path.getsize(file) / (CHUNKSIZE if isEncrypting else 349624))
         piece = (100/chunkNumberFolder)
-        print(chunkNumberFolder, 'chunks total')
-        print('piece: ', piece)
         thothInfo = {
             "hash" : None
         }
@@ -293,7 +290,6 @@ def startModification(isEncrypting:bool):
         
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         
-        #? i'm sorry, there were some changes i want to make here
         def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
             currentFileEncryptionProgress = 0
             currentFileEncryptionTotal = numberOfChunks(filePath)
@@ -332,7 +328,7 @@ def startModification(isEncrypting:bool):
                             newFile.write(modified)
                     currentFileEncryptionProgress += 1
                     globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
-                    message = f"{'Now Encrypting:' if isEncrypting else 'Decrypting:'}\n{filePath}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {globalCurrentEncryptionPercentage}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
+                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {globalCurrentEncryptionPercentage}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
                     textBox.config(text=message)
                     progressBar['value'] += piece
                     print(progressBar['value'])
@@ -418,9 +414,13 @@ def startModification(isEncrypting:bool):
             return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 150)
+    centerWindow(modWindow, 500, 125)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
-    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'} the folder\n{globalCurrentDirectoryObject.path}\nwith the given passcode. Proceed?", font=('Microsoft Sans Serif', 12))
+    if isEncrypting:
+        change = f"Estimated size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*1.33333)}"
+    else:
+        change = f"Estimated size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*0.75)}"
+    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12))
     textBox.pack(padx=5, pady=(5, 5))
     encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
     encryptButton.pack(padx=5, pady=(5, 2))

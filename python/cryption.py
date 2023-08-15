@@ -86,7 +86,7 @@ def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, makeCop
             currentFileEncryptionProgress += 1
             encryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
             if label:
-                label.config(text=f"{'Encrypting' if isEncrypting else 'Decrypting'} file:\n{filePath}\n{encryptionPercentage}%")
+                label.config(text=f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\n{encryptionPercentage}%")
                 root.update()
             if progressBar:
                 progressBar['value'] += piece

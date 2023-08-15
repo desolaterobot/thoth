@@ -22,7 +22,7 @@ def isAllowed(filePath:str):
     return True
 
 #displays a string representation of an integer size in bytes.
-def sizeToString(size:int):
+def sizeToString(size:int, precision:int=2):
     unit = "B"
     if size >= 1024:
         unit = "KB"
@@ -33,7 +33,9 @@ def sizeToString(size:int):
     if size >= 1024:
         unit = "GB"
         size = size / 1024
-    return f"{round(size,3)}{unit}"
+    if precision == 0:
+        return f"{round(size)}{unit}"
+    return f"{round(size, precision)}{unit}"
     
 #the constructor of each class requires two arguments, the parent address and file/directory name.
 class File:
@@ -148,9 +150,12 @@ class Directory:
 
     #get size of current folder.
     def getSize(self):
+        if hasattr(self, 'size'):
+            return self.size
         totalSize = 0
         for itemPath in self.getCompleteFilePathList():
             totalSize += os.path.getsize(itemPath)
+        self.size = totalSize
         return totalSize
 
     #prints out contents into command line

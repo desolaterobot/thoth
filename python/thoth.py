@@ -378,7 +378,7 @@ def startModification(isEncrypting:bool):
         globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
         enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         refreshListBox(None, currentDirectory) #update listbox
-        statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {(endTime-startTime):.3g} seconds. {len(failures)} failures.", fg='white')
+        statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {round(endTime-startTime, 2)} seconds. {len(failures)} failures.", fg='white')
         if failures:
             failureList = ""
             for file in failures:

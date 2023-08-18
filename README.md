@@ -4,7 +4,7 @@
 
 # Named after the Egyptian god of sacred texts, ThothCrypt isn't far from mythology...
 
-### ThothCrypt is a simple graphical program to encrypt entire folders just by using a single passcode, made in Python. Fernet encryption from the cryptography package is used for symmetric encryption and Tkinter is used to handle the GUI. Here's the main menu:
+### ThothCrypt is a simple graphical program to encrypt entire folders just by using a single passcode, made in Python. Supports all file types and sizes! Fernet encryption from the cryptography package is used for symmetric encryption and Tkinter is used to handle the GUI. Here's the main menu:
 
 <p align="center">
   <img src="readme/mainmenu.png" alt="Main Menu">

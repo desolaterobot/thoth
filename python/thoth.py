@@ -20,7 +20,23 @@ globalCurrentDirectoryObject:Directory = None
 globalIsTranslatedBoolean = False
 globalWrongTries = saveload.getData('wrongTries', 0)
 
+MAXFILENAMELENGTH = 225
+
 # FUNCTIONS #############################################################################################
+
+#regular ceasar cipher
+def cipher(text, shift):
+    result = ""
+    for char in text:
+        if char.isalpha():
+            if char.islower():
+                shifted_char = chr((ord(char) - ord('a') + shift + 26) % 26 + ord('a'))
+            elif char.isupper():
+                shifted_char = chr((ord(char) - ord('A') + shift + 26) % 26 + ord('A'))
+        else:
+            shifted_char = char
+        result += shifted_char
+    return result
 
 #includes the 'wrong passcode' message window if passcode is false.
 def checkPass():
@@ -49,13 +65,19 @@ def translateListBox():
             return
         for title,path in globalTitlePathDict.items():
             if isFile(path):
-                encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
-                try:
-                    decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
-                except:
-                    messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
-                    return
-                newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
+                if not path.endswith(".thth"):
+                    encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
+                    try:
+                        decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+                    except:
+                        messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
+                        return
+                    newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
+                else:
+                    extension = os.path.splitext(path)[1]
+                    encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
+                    decryptedFileName = encryptedFileName + "." + cipher(extension.removeprefix("."), -2)
+                    newTitle = title.replace(encryptedFileName + extension, decryptedFileName)
                 newTitles.append(newTitle)
                 newDict[newTitle] = path
             else:
@@ -291,6 +313,7 @@ def startModification(isEncrypting:bool):
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         
         def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
+            print(f'start modification function {filePath}')
             currentFileEncryptionProgress = 0
             currentFileEncryptionTotal = numberOfChunks(filePath)
             isEncrypting = not filePath.endswith('.thth')
@@ -302,15 +325,22 @@ def startModification(isEncrypting:bool):
             if isEncrypting:
                 name = Fernet(key).encrypt(oldFileName.encode()).decode()
                 newFileName = name + ".thth"
+                if len(newFileName) > MAXFILENAMELENGTH:
+                    extension = os.path.splitext(oldFileName)[1].removeprefix('.')
+                    newFileName = oldFileName.removesuffix(os.path.splitext(oldFileName)[1]) + "." + cipher(extension, 2)
             else:
-                newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+                if oldFileName.endswith(".thth"):
+                    newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+                else:
+                    extension = os.path.splitext(oldFileName)[1]
+                    newFileName = oldFileName.removesuffix(extension) + "." + cipher(extension.removeprefix("."), -2)
+
 
             #forming new destination path
             newFilePath = destinationFolder + "\\" + newFileName
 
             #open both files, then start transferring data from old file to new file, encrypting data in the process
             with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
-                print(f'currently modifying {filePath}')
                 while True:
                     if isEncrypting:
                         chunk = oldFile.read(chunkSize) 

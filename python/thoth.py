@@ -307,7 +307,7 @@ def startModification(isEncrypting:bool):
         }
         thothInfo['hash'] = sha256(key.decode())
 
-        progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=300, mode='determinate')
+        progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=460, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
         
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
@@ -357,11 +357,10 @@ def startModification(isEncrypting:bool):
                             modified = Fernet(key).decrypt(chunk)
                             newFile.write(modified)
                     currentFileEncryptionProgress += 1
-                    globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
-                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {globalCurrentEncryptionPercentage}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
+                    #globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {round(progressBar['value'], 3)}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
                     textBox.config(text=message)
                     progressBar['value'] += piece
-                    print(progressBar['value'])
                     root.update()
                     
             #now that all our data is in the new file, delete the old file.
@@ -450,8 +449,11 @@ def startModification(isEncrypting:bool):
         change = f"Estimated size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*1.33333)}"
     else:
         change = f"Estimated size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*0.75)}"
-    textBox = tk.Label(modWindow, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12))
-    textBox.pack(padx=5, pady=(5, 5))
+    textFrame = tk.Frame(modWindow, width=500, height=70);
+    textBox = tk.Label(textFrame, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12), justify="left")
+    textBox.pack(side='left')
+    textFrame.pack(padx=15, pady=(5, 0))
+    textFrame.pack_propagate(False)
     encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
     encryptButton.pack(padx=5, pady=(5, 2))
     encryptButton.focus()

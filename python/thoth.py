@@ -13,18 +13,24 @@ import random
 
 # GLOBAL VARIABLES ######################################################################################
 
-globalVersionNumber = '1.1'
+currentDirectorySize = 0
+prevTimeString = ""
+numberOfChunks = 0
+chunkTime1 = 0
+chunkTime2 = 0
+globalVersionNumber = '1.2'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
 globalIsTranslatedBoolean = False
 globalWrongTries = saveload.getData('wrongTries', 0)
 
-MAXFILENAMELENGTH = 225
+MAXFILENAMELENGTH = 200
 
 # FUNCTIONS #############################################################################################
 
 #regular ceasar cipher
+'''
 def cipher(text, shift):
     result = ""
     for char in text:
@@ -37,6 +43,15 @@ def cipher(text, shift):
             shifted_char = char
         result += shifted_char
     return result
+'''
+
+#takes an int time in seconds, then converts into a string that shows the hours, minutes and seconds.
+def intToTimeString(seconds):
+    hours = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    seconds %= 60
+    return f"{f'{round(hours)} hours ' if hours>0 else ''}{f'{round(minutes)} minutes ' if minutes>0 else ''}{round(seconds, 2)} seconds"
 
 #includes the 'wrong passcode' message window if passcode is false.
 def checkPass():
@@ -65,19 +80,13 @@ def translateListBox():
             return
         for title,path in globalTitlePathDict.items():
             if isFile(path):
-                if not path.endswith(".thth"):
-                    encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
-                    try:
-                        decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
-                    except:
-                        messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
-                        return
-                    newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
-                else:
-                    extension = os.path.splitext(path)[1]
-                    encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
-                    decryptedFileName = encryptedFileName + "." + cipher(extension.removeprefix("."), -2)
-                    newTitle = title.replace(encryptedFileName + extension, decryptedFileName)
+                encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
+                try:
+                    decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+                except:
+                    messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
+                    return
+                newTitle = title.replace(encryptedFileName + ".thth", decryptedFileName)
                 newTitles.append(newTitle)
                 newDict[newTitle] = path
             else:
@@ -283,7 +292,7 @@ def lookInFolder():
 def startModification(isEncrypting:bool):
     def start():
         global globalCurrentDirectoryObject
-        modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files...")
+        modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files... DO NOT CLOSE UNTIL COMPLETION.")
         encryptButton.pack_forget()
         textBox.config(text='\nModification cannot start for some reason. Refresh and try again.')
         #encryption steps: modification, update current directory, update the list box.
@@ -311,11 +320,29 @@ def startModification(isEncrypting:bool):
         progressBar.pack(padx=5, pady=(8, 8))
         
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
-        
+        global currentDirectorySize
+        currentDirectorySize = globalCurrentDirectoryObject.getSize()
+        #recording how much time is taken for a certain number of chunks is encrypted.
+        def checkChunks(sample):
+            global chunkTime1
+            global chunkTime2
+            global numberOfChunks
+            #print(chunkTime1, chunkTime2, numberOfChunks)
+            if numberOfChunks == 0:
+                chunkTime1 = time.time()
+            elif numberOfChunks >= sample:
+                numberOfChunks = -1
+                chunkTime2 = time.time()
+                timeTakenFor5Chunks = chunkTime2 - chunkTime1 
+                global currentDirectorySize
+                totalTimeTaken = (timeTakenFor5Chunks/(sample*256*1024))*(currentDirectorySize)
+                return intToTimeString(totalTimeTaken)
+            return ""
+
         def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
-            print(f'start modification function {filePath}')
+            #print(f'start modification function {filePath}')
             currentFileEncryptionProgress = 0
-            currentFileEncryptionTotal = numberOfChunks(filePath)
+            #currentFileEncryptionTotal = numberOfChunks(filePath)
             isEncrypting = not filePath.endswith('.thth')
             oldFileName = filePath.split(sep='\\')[-1]
             #if destinationFolder is not set to anything, make it the original folder.
@@ -326,14 +353,18 @@ def startModification(isEncrypting:bool):
                 name = Fernet(key).encrypt(oldFileName.encode()).decode()
                 newFileName = name + ".thth"
                 if len(newFileName) > MAXFILENAMELENGTH:
-                    extension = os.path.splitext(oldFileName)[1].removeprefix('.')
-                    newFileName = oldFileName.removesuffix(os.path.splitext(oldFileName)[1]) + "." + cipher(extension, 2)
+                    #if the filename is too long, rename the file.
+                    currentFolder = filePath.removesuffix('\\' + oldFileName)
+                    renamedFile = mdHash(os.path.splitext(oldFileName)[0]) + os.path.splitext(oldFileName)[1]
+                    os.rename(currentFolder + '\\' + oldFileName, currentFolder + '\\' + renamedFile)
+                    oldFileName = renamedFile
+                    newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
+                    filePath = currentFolder + '\\' + renamedFile
             else:
                 if oldFileName.endswith(".thth"):
                     newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
                 else:
-                    extension = os.path.splitext(oldFileName)[1]
-                    newFileName = oldFileName.removesuffix(extension) + "." + cipher(extension.removeprefix("."), -2)
+                    print(f"error decrypting {filePath}")
 
 
             #forming new destination path
@@ -357,8 +388,19 @@ def startModification(isEncrypting:bool):
                             modified = Fernet(key).decrypt(chunk)
                             newFile.write(modified)
                     currentFileEncryptionProgress += 1
+                    global currentDirectorySize
+                    if isEncrypting:
+                        currentDirectorySize -= CHUNKSIZE
+                    else:
+                        currentDirectorySize -= ENCRCHUNKSIZE
                     #globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
-                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {round(progressBar['value'], 3)}%\n{encryptionProgress}/{totalFileNum} Files Encrypted"
+                    global numberOfChunks
+                    global prevTimeString
+                    timeString = checkChunks(100)
+                    if timeString != "":
+                        prevTimeString = timeString
+                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {round(progressBar['value'], 3)}%\n{encryptionProgress}/{totalFileNum} Files Encrypted\nEstimated time taken: {prevTimeString}"
+                    numberOfChunks += 1
                     textBox.config(text=message)
                     progressBar['value'] += piece
                     root.update()
@@ -366,7 +408,7 @@ def startModification(isEncrypting:bool):
             #now that all our data is in the new file, delete the old file.
             os.remove(filePath)
             return newFilePath
-        
+
         startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////``
         failures = []
         for filePath in fileList:
@@ -375,6 +417,8 @@ def startModification(isEncrypting:bool):
                 failures.append(filePath)
             encryptionProgress += 1
             root.update()
+        global prevTimeString
+        prevTimeString = ""
         endTime = time.time() #*END OF MODIFICATION PROCESS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         
         progressBar['value'] = 0
@@ -407,7 +451,7 @@ def startModification(isEncrypting:bool):
         globalCurrentDirectoryObject = path2Dir(currentDirectory) #updating current directory
         enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         refreshListBox(None, currentDirectory) #update listbox
-        statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {round(endTime-startTime, 2)} seconds. {len(failures)} failures.", fg='white')
+        statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {intToTimeString(endTime-startTime)}. {len(failures)} failures.", fg='white')
         if failures:
             failureList = ""
             for file in failures:
@@ -443,13 +487,13 @@ def startModification(isEncrypting:bool):
             return
     #modification window
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 125)
+    centerWindow(modWindow, 500, 150)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
     if isEncrypting:
         change = f"Estimated size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*1.33333)}"
     else:
         change = f"Estimated size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*0.75)}"
-    textFrame = tk.Frame(modWindow, width=500, height=70);
+    textFrame = tk.Frame(modWindow, width=500, height=90);
     textBox = tk.Label(textFrame, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12), justify="left")
     textBox.pack(side='left')
     textFrame.pack(padx=15, pady=(5, 0))
@@ -458,6 +502,7 @@ def startModification(isEncrypting:bool):
     encryptButton.pack(padx=5, pady=(5, 2))
     encryptButton.focus()
 
+#todo RENAME function for long, unchanged filenames
 #such a tedious function for something that is not really related to encryption
 def renameCurrentFile():
     def onSubmit(e=None):

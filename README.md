@@ -13,10 +13,11 @@
 ### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
-### 2. [Common Errors](#common-errors)
-### 3. [Downsides to Encryption](#caveats)
-### 4. [More Features](#more-features)
-### 5. [How It Works](#how-it-works)
+### 2. [What's New](#what's-new)
+### 3. [Common Errors](#common-errors)
+### 4. [Downsides to Encryption](#encryption-caveats)
+### 5. [More Features](#more-features)
+### 6. [How It Works](#how-it-works)
 
 ## Getting Started
 
@@ -99,6 +100,16 @@ After gaining access to a single file like we mentioned earlier, you might want 
 
 ### Adding files into an encrypted folder
 If you want to add unencrypted files into an encrypted folder, simply click on `Add Files` then select the unencrypted files. ThothCrypt will automatically encrypt those files and place them in the target folder. No need to decrypt everything, manually move the files and encrypt everything again. 
+
+## What's New
+### Update 1.2
+- <b>(IMPORTANT FIX)</b> Fixed a bug where files cannot be encrypted properly if the filenames are very long. This occurs because since the filenames have to be encrypted with Fernet as well, encryption might increase the length of an already-long filename length beyond the limits of the OS. Fixed by force-renaming files whenever the names are too long. The files are renamed by using a hash function.
+- Added an estimation for the size bloat of an encryption process. See [Encryption Caveats](#encryption-caveats) for size bloat info.
+- Added a time estimation for how long an encryption of a certain folder will take, which updates as encryption progresses.
+### Update 1.1
+- Fixed a bug where encryption would throw an error when files are too large, typically more than 1.5GB. Introduced chunk-by-chunk encryption approach, which is slower but now supports files of any size.
+- Chunk-by-chunk approach made the progress bar smoother.
+- When the 'Folder already contains some encrypted/decrypted files' error occurs, the error message now shows which folder/subfolder these files belong to. See [Common Errors](#common-errors) for more details.
 
 ## Common Errors
 <b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. Note that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...

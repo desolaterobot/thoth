@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="python/assets/icon.ico" alt="Thoth Logo">
+  <img src="assets/icon.ico" alt="Thoth Logo">
 <p align="center">
 
 # Named after the Egyptian god of sacred texts, ThothCrypt isn't far from mythology...
@@ -193,6 +193,9 @@ Create a list of file extensions that ThothCrypt will ignore when encrypting or 
 
 ### Passcode Generator - in Settings
 Generates a secure 32-character passcode for you that includes lowercase/uppercase characters, numbers and symbols. It even has a function to save it as a `.txt` file onto your desktop.
+
+### Create Shortcut - in Settings
+Creates a desktop shortcut.
 
 ## How it works
 

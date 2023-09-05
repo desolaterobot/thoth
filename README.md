@@ -10,7 +10,7 @@
   <img src="readme/mainmenu.png" alt="Main Menu">
 <p align="center">
 
-### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
+This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
 ### 2. [What's New](#whats-new)

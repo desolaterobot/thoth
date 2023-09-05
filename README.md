@@ -13,7 +13,7 @@
 ### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
-### 2. [What's New](#what's-new)
+### 2. [What's New](#whats-new)
 ### 3. [Common Errors](#common-errors)
 ### 4. [Downsides to Encryption](#encryption-caveats)
 ### 5. [More Features](#more-features)
@@ -99,7 +99,36 @@ After gaining access to a single file like we mentioned earlier, you might want 
 <p align="center">
 
 ### Adding files into an encrypted folder
-If you want to add unencrypted files into an encrypted folder, simply click on `Add Files` then select the unencrypted files. ThothCrypt will automatically encrypt those files and place them in the target folder. No need to decrypt everything, manually move the files and encrypt everything again. 
+If you want to add unencrypted files into an encrypted folder, simply click on `Add Files` then select the unencrypted files. ThothCrypt will automatically encrypt those files and place them in the target folder. No need to decrypt everything, manually move the files and encrypt everything again, saving precious time.
+
+### Additional secruity measures
+Given that this code is completely open source, potential attackers will know how exactly this app works, and they can make use of that by brute force hashing, password guessing, etc.
+
+An additional safety measure would be creating a strong password. Thothcrypt has a built-in function to generate and store passwords, included in the `Settings` section. Make use of it!
+
+If you have Python installed, and understand a little bit of Python, you can change the salt of the key-generating function, making brute-force hashing much more difficult. <b>However, only do this if you have not encrypted anything yet. If you already have done so, decrypt all of them and encrypt them later, after you are done with this process.</b> If you have Python installed, install pyinstaller by running this on the command line:
+```
+pip install pyinstaller
+```
+Once that is done, navigate to the python folder and open the `cryption.py` file in your text editor. Change the salt value of this function to anything undecipherable, like a mixture of symbols, characters and numbers. You can also change the number of iterations, which changes how many times we hash the result.
+
+```python
+#generates a encryption key from a string seed
+def generateKey(seed:str):
+    seed_bytes = str(seed).encode()
+    kdf = PBKDF2HMAC(
+        algorithm = hashes.SHA256(),
+        length = 32,
+        salt = b"mmm... salty", #CHANGE THIS!!
+        iterations=5,
+    )
+    return base64.urlsafe_b64encode(kdf.derive(seed_bytes))
+```
+Salting is the process of adding additional characters in front of an input before hashing, which changes the hash completely, making it harder to brute-force.
+
+After changing the code, compile it by clicking on `compile.bat`. This updates the `thoth.exe` file with the changes you have made. Compilation takes a while, so please wait for it to finish.
+
+After compilation is done, you can delete the python files, to remove the evidence of what you have changed. Don't delete anything else.
 
 ## What's New
 ### Update 1.2
@@ -112,9 +141,9 @@ If you want to add unencrypted files into an encrypted folder, simply click on `
 - When the 'Folder already contains some encrypted/decrypted files' error occurs, the error message now shows which folder/subfolder these files belong to. See [Common Errors](#common-errors) for more details.
 
 ## Common Errors
-<b>Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. Note that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
+<b>1. Wrong passcode:</b> The passcode you typed was not the same as the passcode used to encrypt the folder. When encrypting, always remember the passcode used to do so. Note that this error only arises whenever decryption is necessary, e.g. Folder Decryption, Translation, Renaming of Encrypted Files, Opening Encrypted Files...
 
-<b>Folder already contains some encrypted/decrypted files:</b> The `Encrypt Folder`, `Decrypt Folder` and `Translate` buttons only work if EVERY file in the target folder is unencrypted or encrypted respectively. It does not work if the target folder is supposed to be encrypted, but contains some decrypted files or vice versa. For reference, an encrypted file is a file that has a string of random characters as names, followed by a `.thth` extension, and a folder that is supposed to be encrypted contains a file with the name of the folder as its name, followed by a `.ththscrpt` extension.
+<b>2. Folder already contains some encrypted/decrypted files:</b> The `Encrypt Folder`, `Decrypt Folder` and `Translate` buttons only work if EVERY file in the target folder is unencrypted or encrypted respectively. It does not work if the target folder is supposed to be encrypted, but contains some decrypted files or vice versa. For reference, an encrypted file is a file that has a string of random characters as names, followed by a `.thth` extension, and a folder that is supposed to be encrypted contains a file with the name of the folder as its name, followed by a `.ththscrpt` extension.
 
 <p align="center">
   <img src="readme/alreadyContains.png" alt="File Already Contains... Error">

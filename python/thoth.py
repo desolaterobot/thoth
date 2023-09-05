@@ -18,7 +18,7 @@ prevTimeString = ""
 numberOfChunks = 0
 chunkTime1 = 0
 chunkTime2 = 0
-globalVersionNumber = '1.2'
+globalVersionNumber = '1.2.1'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
@@ -109,7 +109,10 @@ def centerWindow(window, width, height):
     x = (screenW // 2) - (width // 2)
     y = (screenH // 2) - (height // 2)
     window.geometry(f"{width}x{height}+{x}+{y}")
-    window.iconbitmap("python\\assets\\icon.ico")
+    try:
+        window.iconbitmap("assets\\icon.ico")
+    except:
+        pass
 
 def showRightFrame(isNormal):
     rightFrame.grid(column=2, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
@@ -613,12 +616,14 @@ def openSettings():
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
     # image
-    imgPath = "python\\assets\\icon.png"
-    img = Image.open(imgPath).resize((100,100))
-    photo = ImageTk.PhotoImage(img)
-    image_label = tk.Label(settingsWindow, image=photo, bg=normalSideCol)
-    image_label.image = photo
-    image_label.pack(pady=10)
+    imgPath = "assets\\icon.png"
+    try:
+        img = Image.open(imgPath).resize((100,100))
+    except:
+        photo = ImageTk.PhotoImage(img)
+        image_label = tk.Label(settingsWindow, image=photo, bg=normalSideCol)
+        image_label.image = photo
+        image_label.pack(pady=10)
     label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber}', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
     label0.pack()
     #forbidden file extensions

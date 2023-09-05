@@ -3,7 +3,7 @@
 
 import os
 
-globalDir = os.path.expanduser("~")+"\AppData\Local\Thoth"
+globalDir = os.getcwd() + "\savedData" #os.path.expanduser("~")+"\AppData\Local\Thoth"
 
 def firstTime():
     #first time setup, create the directory and all the things in it, if havent.
@@ -15,6 +15,7 @@ def firstTime():
             "forbidden" : ['.ini', '.ththscrpt', '.git'],
             "wrongTries" : 0,
         }
+    
     open(globalDir + "\\" + "data.ththscrpt", "w").write(str(empty))
 
 #get a value from the stored dictionary, if key does not exist, defaultData is returned and stored.

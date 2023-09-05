@@ -10,6 +10,7 @@ from tkinter import PhotoImage
 import time
 import string
 import random
+import shortcuts
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -18,7 +19,7 @@ prevTimeString = ""
 numberOfChunks = 0
 chunkTime1 = 0
 chunkTime2 = 0
-globalVersionNumber = '1.2.1'
+globalVersionNumber = '1.3'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
@@ -505,7 +506,6 @@ def startModification(isEncrypting:bool):
     encryptButton.pack(padx=5, pady=(5, 2))
     encryptButton.focus()
 
-#todo RENAME function for long, unchanged filenames
 #such a tedious function for something that is not really related to encryption
 def renameCurrentFile():
     def onSubmit(e=None):
@@ -609,6 +609,12 @@ def openSettings():
             settingsWindow.destroy()
         else:
             saveToDesktop(num+1)
+    
+    def putShortcutToDesktop():
+        fullpath = os.path.abspath("thoth.exe")
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        shortcuts.createShortcut(fullpath, 'ThothCrypt', desktop)
+        settingsWindow.destroy()
 
     settingsWindow = tk.Toplevel()
     settingsWindow.title('ThothCrypt Settings')
@@ -619,11 +625,12 @@ def openSettings():
     imgPath = "assets\\icon.png"
     try:
         img = Image.open(imgPath).resize((100,100))
-    except:
         photo = ImageTk.PhotoImage(img)
         image_label = tk.Label(settingsWindow, image=photo, bg=normalSideCol)
         image_label.image = photo
         image_label.pack(pady=10)
+    except:
+        pass
     label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber}', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
     label0.pack()
     #forbidden file extensions
@@ -650,8 +657,10 @@ def openSettings():
     passGenBox.pack(padx=5, pady=5)
     generateButton = tk.Button(settingsWindow, text='Generate', font=('Microsoft Sans Serif', 13), command=generatePasscode)
     generateButton.pack(pady=(5,5))
-    generateButton = tk.Button(settingsWindow, text='Store In Desktop', font=('Microsoft Sans Serif', 13), command=saveToDesktop)
-    generateButton.pack(pady=(5,5))
+    storeButton = tk.Button(settingsWindow, text='Store In Desktop', font=('Microsoft Sans Serif', 13), command=saveToDesktop)
+    storeButton.pack(pady=(5,5))
+    shortButton = tk.Button(settingsWindow, text='Create Shortcut To Desktop', font=('Microsoft Sans Serif', 13), command=putShortcutToDesktop)
+    shortButton.pack(pady=(5,5))
 
 def addFilesIntoEncryptedFolder():
     if not checkPass():

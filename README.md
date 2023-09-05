@@ -131,6 +131,9 @@ After changing the code, compile it by clicking on `compile.bat`. This updates t
 After compilation is done, you can delete the python files, to remove the evidence of what you have changed. Don't delete anything else.
 
 ## What's New
+### Update 1.3
+- Folder restructuring changes
+- Added a button in the settings section that adds a ThothCrypt shortcut to the desktop!
 ### Update 1.2
 - <b>(IMPORTANT FIX)</b> Fixed a bug where files cannot be encrypted properly if the filenames are very long. This occurs because since the filenames have to be encrypted with Fernet as well, encryption might increase the length of an already-long filename length beyond the limits of the OS. Fixed by force-renaming files whenever the names are too long. The files are renamed by using a hash function.
 - Added an estimation for the size bloat of an encryption process. See [Encryption Caveats](#encryption-caveats) for size bloat info.

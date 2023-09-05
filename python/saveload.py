@@ -12,7 +12,7 @@ def firstTime():
     except:
         pass
     empty = {
-            "forbidden" : ['.ini', '.ththscrpt', '.git'],
+            "forbidden" : ['.ini', '.ththscrpt'],
             "wrongTries" : 0,
         }
     

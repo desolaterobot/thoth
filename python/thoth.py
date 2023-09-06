@@ -206,6 +206,7 @@ def showStatus(directory):
     globalIsTranslatedBoolean = False
     dirBox.delete(0, tk.END)
     dirBox.insert(0, directory)
+    saveload.setData("lastVisited", directory)
     disableWidgets((dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton))
     startTime = time.time()
     statusLabel.config(text=f'Searching target folder... you seem to have a lot of files here...')
@@ -241,7 +242,7 @@ def refreshListBox(e, directory:str):
     #check if the folder is the C drive itself or directly nested in the C: drive or C:\Users\name.
     #I assume there are more 'crucial' folders but this should be enough, I put full trust in the user to encrypt responsibly
     if directory.endswith(':') or directory == os.path.expanduser("~") or len(directory.split('\\')) == 2:
-        if not messagebox.askyesno(f"Dangerous folder", f"Thoth does not reccommend encrypting or even looking into {directory} due to its size and importance. Look into it anyway?"):
+        if not messagebox.askyesno(f"Significant folder", f"{directory} seems to be a rather significant folder, like a main drive or a primary subfolder from it. Please be careful. Look into it anyway?"):
             return 'NOTRECCOMMEND'
     if directory == "":
         hideRightFrame()
@@ -615,10 +616,23 @@ def openSettings():
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         shortcuts.createShortcut(fullpath, 'ThothCrypt', desktop)
         settingsWindow.destroy()
+    
+    def lastVisitedToggle():
+        saveload.setData("enableLastVisited", enableLastVisited.get())
+        if not enableLastVisited.get():
+            saveload.setData("lastVisited", None)
+        pass
+
+    def autoRefreshToggle():
+        saveload.setData("enableAutoRefresh", enableAutoRefresh.get())
+        pass
+
+    enableLastVisited = tk.BooleanVar(value=saveload.getData("enableLastVisited", False))
+    enableAutoRefresh = tk.BooleanVar(value=saveload.getData("enableAutoRefresh", False))
 
     settingsWindow = tk.Toplevel()
     settingsWindow.title('ThothCrypt Settings')
-    centerWindow(settingsWindow, 500, 550)
+    centerWindow(settingsWindow, 500, 650)
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
     # image
@@ -659,6 +673,12 @@ def openSettings():
     generateButton.pack(pady=(5,5))
     storeButton = tk.Button(settingsWindow, text='Store In Desktop', font=('Microsoft Sans Serif', 13), command=saveToDesktop)
     storeButton.pack(pady=(5,5))
+    label5 = tk.Label(settingsWindow, text='General Settings', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
+    label5.pack(pady=(10,0))
+    toggle1 = tk.Checkbutton(settingsWindow, text="Remember last-visited folder", var=enableLastVisited, bg=normalSideCol, fg=textColor, command=lastVisitedToggle, selectcolor=normalSideCol)
+    toggle1.pack()
+    toggle2 = tk.Checkbutton(settingsWindow, text="Automatically visit last visited folder on startup", var=enableAutoRefresh, bg=normalSideCol, fg=textColor, command=autoRefreshToggle, selectcolor=normalSideCol)
+    toggle2.pack()
     shortButton = tk.Button(settingsWindow, text='Create Shortcut To Desktop', font=('Microsoft Sans Serif', 13), command=putShortcutToDesktop)
     shortButton.pack(pady=(5,5))
 
@@ -711,6 +731,10 @@ targetLabel.pack(pady=(10,2))
 dirBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=70)
 dirBox.bind('<Return>', lambda e: refreshListBox(e, dirBox.get()))
 dirBox.pack(padx=5, pady=5)
+if saveload.getData("enableLastVisited"):
+    lastVisited = saveload.getData(key="lastVisited")
+    if lastVisited:
+        dirBox.insert(0, lastVisited)
 
 buttonLF = tk.Frame(leftFrame, bg=normalBGCol)
 findDirectoryButton = tk.Button(buttonLF, text='Search for folder...', font=('Microsoft Sans Serif', 13), command=searchDirectory)
@@ -851,5 +875,8 @@ decryptFolderButton.pack(padx=15, pady=(14, 4))
 
 leftFrame.grid(column=0, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
 scrollbar.grid(column=1, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
+
+if saveload.getData("enableAutoRefresh", False):
+    refreshListBox(None, dirBox.get())
 
 root.mainloop()

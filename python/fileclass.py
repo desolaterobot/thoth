@@ -4,6 +4,7 @@ from cryption import *
 import os
 from os.path import isfile as isFile
 import sys
+from tkinter import messagebox
 
 from colorama import Fore, Style
 import colorama
@@ -63,26 +64,27 @@ class Directory:
         totalFileCount = 0
         totalDirCount = 0
 
-        if not (os.access(self.path, os.R_OK) and os.access(self.path, os.W_OK) and os.access(self.path, os.X_OK)):
-            print(f"CANNOT ACCESS {self.path}")
-            return
+        print(f"checking permission: {self.path}")
 
-        for item in os.listdir(self.path):
-            fileAddr = joinAddr(self.path, item)
-            #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
-            if fileAddr.endswith('.ththscrpt'):
-                self.isEncrypted = True
-            if fileAddr.endswith('.thth'):
-                self.containsEncryptedFiles = True
-            if not isAllowed(fileAddr):
-                continue #ignore if given fileaddr is not allowed
-            if isFile(fileAddr):
-                self.contents.append(File(self.path, item))
-                totalFileCount+=1
-            else:
-                addeddir = Directory(self.path, item)
-                self.contents.append(addeddir)
-                totalDirCount+=1
+        try:
+            for item in os.listdir(self.path):
+                fileAddr = joinAddr(self.path, item)
+                #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
+                if fileAddr.endswith('.ththscrpt'):
+                    self.isEncrypted = True
+                if fileAddr.endswith('.thth'):
+                    self.containsEncryptedFiles = True
+                if not isAllowed(fileAddr):
+                    continue #ignore if given fileaddr is not allowed
+                if isFile(fileAddr):
+                    self.contents.append(File(self.path, item))
+                    totalFileCount+=1
+                else:
+                    addeddir = Directory(self.path, item)
+                    self.contents.append(addeddir)
+                    totalDirCount+=1
+        except:
+            messagebox.showwarning(f"Error accessing {self.name}", f"{self.path}\nseems to be inaccessible, most likely due to a permission error. This folder will be treated as empty. If you want these files encrypted, move them to another folder.")
         
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount

@@ -1,1 +1,1 @@
-{'forbidden': ['.ini', '.ththscrpt', '.git'], 'wrongTries': 0}
+{'forbidden': ['.ini', '.ththscrpt', '.git'], 'wrongTries': 3}

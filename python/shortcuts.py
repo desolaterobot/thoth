@@ -18,5 +18,3 @@ del "%~f0"
     '''
     open("shortcutCreator.bat", "w").write(content)
     os.startfile('shortcutCreator.bat')
-
-#createShortcut("C:CODE\\python\\thoth\\thoth.exe", "ThothCrypt", "C:CODE\\python\\thoth")

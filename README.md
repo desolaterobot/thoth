@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="python/assets/icon.ico" alt="Thoth Logo">
+  <img src="assets/icon.ico" alt="Thoth Logo">
 <p align="center">
 
 # Named after the Egyptian god of sacred texts, ThothCrypt isn't far from mythology...
@@ -10,7 +10,7 @@
   <img src="readme/mainmenu.png" alt="Main Menu">
 <p align="center">
 
-### This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
+This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
 ### 2. [What's New](#whats-new)
@@ -193,6 +193,9 @@ Create a list of file extensions that ThothCrypt will ignore when encrypting or 
 
 ### Passcode Generator - in Settings
 Generates a secure 32-character passcode for you that includes lowercase/uppercase characters, numbers and symbols. It even has a function to save it as a `.txt` file onto your desktop.
+
+### Create Shortcut - in Settings
+Creates a desktop shortcut.
 
 ## How it works
 

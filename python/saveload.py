@@ -3,7 +3,8 @@
 
 import os
 
-globalDir = os.getcwd() + "\savedData" #os.path.expanduser("~")+"\AppData\Local\Thoth"
+#globalDir = os.getcwd() + "\savedData" #os.path.expanduser("~")+"\AppData\Local\Thoth"
+globalDir = os.path.dirname(os.path.abspath(__file__)) + "\savedData"
 
 def firstTime():
     #first time setup, create the directory and all the things in it, if havent.

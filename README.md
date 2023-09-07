@@ -136,6 +136,7 @@ After compilation is done, you can delete the python files, to remove the eviden
 - Added a button in the settings section that adds a ThothCrypt shortcut to the desktop.
 - Added options to save the last visited folder and to automatically refresh on startup.
 - Permission errors while searching through folders will now present a warning message, and will be taken as empty.
+- Added a button to decrypt and shift a single file out of an encrypted folder, and into the desktop. Use this if you want to move only selected files out of an encrypted folder without decrypting the entire folder at once.
 ### Update 1.2
 - <b>(IMPORTANT FIX)</b> Fixed a bug where files cannot be encrypted properly if the filenames are very long. This occurs because since the filenames have to be encrypted with Fernet as well, encryption might increase the length of an already-long filename length beyond the limits of the OS. Fixed by force-renaming files whenever the names are too long. The files are renamed by using a hash function.
 - Added an estimation for the size bloat of an encryption process. See [Encryption Caveats](#encryption-caveats) for size bloat info.

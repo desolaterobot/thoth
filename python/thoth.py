@@ -94,6 +94,8 @@ def translateListBox():
                 newTitles.append(title)
                 newDict[title] = path
         dirlistbox.config(fg=purpleTextColor)
+        removeFileButton.config(state='disabled')
+        renameButton.config(state='disabled')
         globalTitlePathDict = newDict
         #showing the listbox with updated titles.
         showListBox(dirlistbox, newTitles)
@@ -324,7 +326,7 @@ def startModification(isEncrypting:bool):
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=460, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
         
-        disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
+        disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton, removeFileButton))
         global currentDirectorySize
         currentDirectorySize = globalCurrentDirectoryObject.getSize()
         #recording how much time is taken for a certain number of chunks is encrypted.
@@ -547,7 +549,7 @@ def renameCurrentFile():
     #getting the file extension
     name = globalCurrentlySelectedPath.split('\\')[-1] #gets the pure filename
     if name.endswith('.thth') and not globalIsTranslatedBoolean:
-        messagebox.showerror('Attempting to rename encrypted file', 'It is not advised that you rename an encrypted file. If you want to rename an encrypted file at its normal state, click on "Translate", select the desired file, then click on "Rename" again.')
+        messagebox.showerror('Attempting to rename encrypted file', 'Cannot rename file in non-translated mode. Click on "Translate" then try again.s')
         return
     extension = os.path.splitext(name)[1] #gets the file extension from the pure filename
     if globalIsTranslatedBoolean: #! if file is encrypted, to get the extension, remove the .thth suffix first, decrypt the name, then get extension.
@@ -675,9 +677,9 @@ def openSettings():
     storeButton.pack(pady=(5,5))
     label5 = tk.Label(settingsWindow, text='General Settings', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
     label5.pack(pady=(10,0))
-    toggle1 = tk.Checkbutton(settingsWindow, text="Remember last-visited folder", var=enableLastVisited, bg=normalSideCol, fg=textColor, command=lastVisitedToggle, selectcolor=normalSideCol)
+    toggle1 = tk.Checkbutton(settingsWindow, text="Remember last-visited folder", font=('Microsoft Sans Serif', 10), var=enableLastVisited, bg=normalSideCol, fg=textColor, command=lastVisitedToggle, selectcolor=normalSideCol)
     toggle1.pack()
-    toggle2 = tk.Checkbutton(settingsWindow, text="Automatically visit last visited folder on startup", var=enableAutoRefresh, bg=normalSideCol, fg=textColor, command=autoRefreshToggle, selectcolor=normalSideCol)
+    toggle2 = tk.Checkbutton(settingsWindow, text="Automatically visit last visited folder on startup", font=('Microsoft Sans Serif', 10), var=enableAutoRefresh, bg=normalSideCol, fg=textColor, command=autoRefreshToggle, selectcolor=normalSideCol)
     toggle2.pack()
     shortButton = tk.Button(settingsWindow, text='Create Shortcut To Desktop', font=('Microsoft Sans Serif', 13), command=putShortcutToDesktop)
     shortButton.pack(pady=(5,5))
@@ -685,7 +687,8 @@ def openSettings():
 def addFilesIntoEncryptedFolder():
     if not checkPass():
         return
-    messagebox.showinfo('Encrypt and add files', 'In the following window, select the files you want to encrypt and add into the target folder.')
+    if not messagebox.askokcancel('Encrypt and add files', 'In the following window, select the files you want to encrypt and add into the target folder.'):
+        return
     fileList = list(filedialog.askopenfilenames(title='Select files to encrypt and add to target folder...'))
     for file in fileList:
         if file.endswith('.thth') or file.endswith('.ththscrpt'):
@@ -703,6 +706,27 @@ def addFilesIntoEncryptedFolder():
         filecount+=1
     window.destroy()
     refreshListBox(None, globalCurrentDirectoryObject.path)
+
+def removeFileFromEncryptedFolder():
+    if not checkPass():
+        return
+    filename = globalCurrentlySelectedPath.split(sep="\\")[-1]
+    key = generateKey(passBox.get())
+    if not messagebox.askokcancel("Decrypt and move to desktop...", f"This function decrypts {Fernet(key).decrypt(filename.removesuffix('.thth').encode()).decode()} only and moves it to a folder in the desktop."):
+        return
+    destinationFolder = joinAddr(os.path.expanduser("~\\Desktop"), "fromThoth")
+    try:
+        os.makedirs(destinationFolder)
+    except:
+        pass
+    window, label, bar = progressWindow(f'Encrypting and adding files into {globalCurrentDirectoryObject.name}...')
+    label.config(text=f"Encrypting and moving {filename} to desktop...")
+    window.title("Decrypt to desktop...")
+    modifyByChunk(globalCurrentlySelectedPath, key, destinationFolder, False, label, bar, window)
+    selected_indices = dirlistbox.curselection()
+    for index in selected_indices:
+        dirlistbox.delete(index)
+    window.destroy()
 
 # GUI #######################################################################################################################################
 
@@ -780,6 +804,10 @@ def fileSelected(event):
         else:
             lookInFolderButton.config(state='disabled')
             renameButton.config(state='normal')
+        if globalIsTranslatedBoolean:
+            removeFileButton.config(state='normal')
+        else:
+            removeFileButton.config(state='disabled')
         deleteFileButton.config(state='normal')
         print("Selected ", globalCurrentlySelectedPath)
 
@@ -870,6 +898,8 @@ translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Micr
 translateFolderButton.pack(padx=15, pady=(14, 4))
 addFilesButton = tk.Button(encrButtonFrame, text='Add Files', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
 addFilesButton.pack(padx=15, pady=(14, 4))
+removeFileButton = tk.Button(encrButtonFrame, text='Remove File', font=('Microsoft Sans Serif', 13), state='disabled',command=removeFileFromEncryptedFolder)
+removeFileButton.pack(padx=15, pady=(14, 4))
 decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
 decryptFolderButton.pack(padx=15, pady=(14, 4))
 

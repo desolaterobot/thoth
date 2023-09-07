@@ -25,26 +25,11 @@ globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
 globalIsTranslatedBoolean = False
 globalWrongTries = saveload.getData('wrongTries', 0)
+thothDirectory = os.path.dirname(os.path.abspath(__file__)).removesuffix("\\python")
 
 MAXFILENAMELENGTH = 200
 
 # FUNCTIONS #############################################################################################
-
-#regular ceasar cipher
-'''
-def cipher(text, shift):
-    result = ""
-    for char in text:
-        if char.isalpha():
-            if char.islower():
-                shifted_char = chr((ord(char) - ord('a') + shift + 26) % 26 + ord('a'))
-            elif char.isupper():
-                shifted_char = chr((ord(char) - ord('A') + shift + 26) % 26 + ord('A'))
-        else:
-            shifted_char = char
-        result += shifted_char
-    return result
-'''
 
 #takes an int time in seconds, then converts into a string that shows the hours, minutes and seconds.
 def intToTimeString(seconds):
@@ -113,7 +98,7 @@ def centerWindow(window, width, height):
     y = (screenH // 2) - (height // 2)
     window.geometry(f"{width}x{height}+{x}+{y}")
     try:
-        window.iconbitmap("assets\\icon.ico")
+        window.iconbitmap(joinAddr(thothDirectory, "\\assets\\icon.ico"))
     except:
         pass
 
@@ -144,8 +129,6 @@ def disableWidgets(widgetTuple:tuple):
 def enableWidgets(widgetTuple:tuple):
     for widget in widgetTuple:
         widget.config(state='normal')
-
-globalTotalFilesFound = 0
 
 def progressWindow(title:str='', labelText:str='', size:tuple=(500,125)):
     window = tk.Toplevel(root)
@@ -549,7 +532,7 @@ def renameCurrentFile():
     #getting the file extension
     name = globalCurrentlySelectedPath.split('\\')[-1] #gets the pure filename
     if name.endswith('.thth') and not globalIsTranslatedBoolean:
-        messagebox.showerror('Attempting to rename encrypted file', 'Cannot rename file in non-translated mode. Click on "Translate" then try again.s')
+        messagebox.showerror('Attempting to rename encrypted file', 'Cannot rename file in non-translated mode. Click on "Translate" then try again.')
         return
     extension = os.path.splitext(name)[1] #gets the file extension from the pure filename
     if globalIsTranslatedBoolean: #! if file is encrypted, to get the extension, remove the .thth suffix first, decrypt the name, then get extension.
@@ -638,7 +621,8 @@ def openSettings():
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
     # image
-    imgPath = "assets\\icon.png"
+    print(thothDirectory)
+    imgPath = joinAddr(thothDirectory, "\\assets\\icon.png")
     try:
         img = Image.open(imgPath).resize((100,100))
         photo = ImageTk.PhotoImage(img)
@@ -647,7 +631,7 @@ def openSettings():
         image_label.pack(pady=10)
     except:
         pass
-    label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber}', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
+    label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber} - Made by Dimas Rizky', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
     label0.pack()
     #forbidden file extensions
     label1 = tk.Label(settingsWindow, text='Forbidden file extensions', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
@@ -728,12 +712,89 @@ def removeFileFromEncryptedFolder():
         dirlistbox.delete(index)
     window.destroy()
 
+#function runs whenever something is selected from the listbox
+def fileSelected(event):
+    selected_index = dirlistbox.curselection()
+    if selected_index:
+        index = selected_index[0]
+        global globalCurrentlySelectedPath
+        globalCurrentlySelectedPath = globalTitlePathDict[dirlistbox.get(index)]
+        if not isFile(globalCurrentlySelectedPath):
+            lookInFolderButton.config(state='normal')
+            renameButton.config(state='disabled')
+        else:
+            lookInFolderButton.config(state='disabled')
+            if (not globalCurrentDirectoryObject.isEncrypted) or (globalCurrentDirectoryObject.isEncrypted and globalIsTranslatedBoolean):
+                renameButton.config(state='normal')
+        if globalIsTranslatedBoolean:
+            removeFileButton.config(state='normal')
+        else:
+            removeFileButton.config(state='disabled')
+        deleteFileButton.config(state='normal')
+        print("Selected ", globalCurrentlySelectedPath)
+
+#start whatever file/folder is being selected from the listbox
+def startFile(event):
+    global globalCurrentlySelectedPath
+    global globalCurrentDirectoryObject
+    path = globalCurrentlySelectedPath
+    key = generateKey(passBox.get())
+    if globalIsTranslatedBoolean and isFile(path):
+        if checkPass():
+            name = Fernet(key).decrypt(path.split(sep='\\')[-1].removesuffix('.thth').encode()).decode()
+            window, label, progress = progressWindow(f'Opening {name}...')
+            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True, progressBar=progress, label=label, root=root)
+            window.destroy()
+            os.system(f'start "" "{storedpath}"')
+            if isinstance(storedpath, Exception): #some error handling i guess
+                messagebox.showerror('Error', f'Error decrypting file: {Exception}')
+                return
+            disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton, removeFileButton, addFilesButton))
+            name = storedpath.split(sep='\\')[-1]
+            if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
+                window, label, progress = progressWindow(f'Saving {name}...')
+                reEncryptSingleFile(storedpath, path, key, label=label, progressBar=progress, root=root)
+                window.destroy()
+            os.remove(storedpath)
+            enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton, addFilesButton))
+            return
+    index = dirlistbox.nearest(event.y)
+    if index < 0:
+        print('nothing selected')
+        return
+    selected_item = dirlistbox.get(index)
+    filepath:str = globalTitlePathDict[selected_item]
+    if filepath.endswith('.thth'):
+        messagebox.showwarning('Opening encrypted file not reccommended', 'It is advised not to open an encrypted file as it would just show you useless scrambled info AND you run the risk of accidentally modifying the file, which might render it unrecoverable. If you want to open a single file at its encrypted state, click "Translate" first, then double click on your desired file.')
+        return
+    os.system(f'start "" "{filepath}"')
+
+#from the current target folder, navigate to parent folder and set it as the target folder.
+def gotoParentFolder():
+    lastUnit = globalCurrentDirectoryObject.path.split(sep='\\')[-1]
+    newPath = globalCurrentDirectoryObject.path.removesuffix('\\' + lastUnit)
+    if refreshListBox(None, newPath) == 'NOTRECCOMMEND':
+        return
+    dirBox.delete(0, tk.END)
+    dirBox.insert(0, newPath)
+    lookInFolderButton.config(state='disabled')
+
+def rightClick(event):
+    index = dirlistbox.nearest(event.y)
+    if index < 0:
+        print('nothing selected')
+        return
+    selected = dirlistbox.get(index)
+    global globalTitlePathDict
+    name = globalTitlePathDict[selected].split(sep='\\')[-1]
+    messagebox.showinfo(f"{name}: Full Path", f"{globalTitlePathDict[selected]}")
+
 # GUI #######################################################################################################################################
 
 root = tk.Tk()
 root.title(f"ThothCrypt {globalVersionNumber}")
 root.resizable(False, False)
-centerWindow(root, 1020, 675)
+centerWindow(root, 1045, 675)
 
 normalListCol = '#001e21'
 normalBGCol = '#003d45'
@@ -783,89 +844,13 @@ dirlistbox = tk.Listbox(
     leftFrame, yscrollcommand=scrollbar.set, xscrollcommand=horizontalScrollBar.set, selectmode=tk.SINGLE, width=100, height=20, font=('Consolas', 11),
     bg=normalListCol, fg=textColor, highlightbackground='black',
     selectbackground=greenTextColor, selectforeground=normalListCol, selectborderwidth=0,
-    )
+)
 horizontalScrollBar.config(command=dirlistbox.xview)
 scrollbar.config(command=dirlistbox.yview)
 dirlistbox.pack(padx=20, pady=(10,0), expand=False)
 dirlistbox.pack_propagate(False)
 horizontalScrollBar.pack(pady=(0,10), fill=tk.X, padx=20, expand=False)
 horizontalScrollBar.pack_propagate(False)
-
-#function runs whenever something is selected from the listbox
-def fileSelected(event):
-    selected_index = dirlistbox.curselection()
-    if selected_index:
-        index = selected_index[0]
-        global globalCurrentlySelectedPath
-        globalCurrentlySelectedPath = globalTitlePathDict[dirlistbox.get(index)]
-        if not isFile(globalCurrentlySelectedPath):
-            lookInFolderButton.config(state='normal')
-            renameButton.config(state='disabled')
-        else:
-            lookInFolderButton.config(state='disabled')
-            renameButton.config(state='normal')
-        if globalIsTranslatedBoolean:
-            removeFileButton.config(state='normal')
-        else:
-            removeFileButton.config(state='disabled')
-        deleteFileButton.config(state='normal')
-        print("Selected ", globalCurrentlySelectedPath)
-
-#start whatever file/folder is being selected from the listbox
-def startFile(event):
-    global globalCurrentlySelectedPath
-    global globalCurrentDirectoryObject
-    path = globalCurrentlySelectedPath
-    key = generateKey(passBox.get())
-    if globalIsTranslatedBoolean and isFile(path):
-        if checkPass():
-            name = Fernet(key).decrypt(path.split(sep='\\')[-1].removesuffix('.thth').encode()).decode()
-            window, label, progress = progressWindow(f'Opening {name}...')
-            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True, progressBar=progress, label=label, root=root)
-            window.destroy()
-            os.system(f'start "" "{storedpath}"')
-            if isinstance(storedpath, Exception): #some error handling i guess
-                messagebox.showerror('Error', f'Error decrypting file: {Exception}')
-                return
-            disableWidgets((dirlistbox, dirBox, passBox, lookInFolderButton, findDirectoryButton, refreshButton, decryptFolderButton, renameButton, parentFolderButton, deleteFileButton, translateFolderButton))
-            name = storedpath.split(sep='\\')[-1]
-            if messagebox.askyesno(f"File opened: {name}", "Would you like to save changes made to the file? Only click 'Yes' if you have made changes."):
-                window, label, progress = progressWindow(f'Saving {name}...')
-                reEncryptSingleFile(storedpath, path, key, label=label, progressBar=progress, root=root)
-                window.destroy()
-            os.remove(storedpath)
-            enableWidgets((dirlistbox, dirBox, passBox, findDirectoryButton, refreshButton, decryptFolderButton, parentFolderButton, translateFolderButton))
-            return
-    index = dirlistbox.nearest(event.y)
-    if index < 0:
-        print('nothing selected')
-        return
-    selected_item = dirlistbox.get(index)
-    filepath:str = globalTitlePathDict[selected_item]
-    if filepath.endswith('.thth'):
-        messagebox.showwarning('Opening encrypted file not reccommended', 'It is advised not to open an encrypted file as it would just show you useless scrambled info AND you run the risk of accidentally modifying the file, which might render it unrecoverable. If you want to open a single file at its encrypted state, click "Translate" first, then double click on your desired file.')
-        return
-    os.system(f'start "" "{filepath}"')
-
-#from the current target folder, navigate to parent folder and set it as the target folder.
-def gotoParentFolder():
-    lastUnit = globalCurrentDirectoryObject.path.split(sep='\\')[-1]
-    newPath = globalCurrentDirectoryObject.path.removesuffix('\\' + lastUnit)
-    if refreshListBox(None, newPath) == 'NOTRECCOMMEND':
-        return
-    dirBox.delete(0, tk.END)
-    dirBox.insert(0, newPath)
-    lookInFolderButton.config(state='disabled')
-
-def rightClick(event):
-    index = dirlistbox.nearest(event.y)
-    if index < 0:
-        print('nothing selected')
-        return
-    selected = dirlistbox.get(index)
-    global globalTitlePathDict
-    name = globalTitlePathDict[selected].split(sep='\\')[-1]
-    messagebox.showinfo(f"{name}: Full Path", f"{globalTitlePathDict[selected]}")
 
 dirlistbox.bind('<<ListboxSelect>>', fileSelected)
 dirlistbox.bind('<Double-Button-1>', startFile)
@@ -898,7 +883,7 @@ translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Micr
 translateFolderButton.pack(padx=15, pady=(14, 4))
 addFilesButton = tk.Button(encrButtonFrame, text='Add Files', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
 addFilesButton.pack(padx=15, pady=(14, 4))
-removeFileButton = tk.Button(encrButtonFrame, text='Remove File', font=('Microsoft Sans Serif', 13), state='disabled',command=removeFileFromEncryptedFolder)
+removeFileButton = tk.Button(encrButtonFrame, text='Decrypt and Move', font=('Microsoft Sans Serif', 13), state='disabled',command=removeFileFromEncryptedFolder)
 removeFileButton.pack(padx=15, pady=(14, 4))
 decryptFolderButton = tk.Button(encrButtonFrame, text='Decrypt Folder', font=('Microsoft Sans Serif', 13), command=lambda: startModification(False), fg=normalListCol, bg=greenTextColor)
 decryptFolderButton.pack(padx=15, pady=(14, 4))

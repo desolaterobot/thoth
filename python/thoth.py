@@ -11,6 +11,7 @@ import time
 import string
 import random
 import shortcuts
+import drive
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -476,13 +477,20 @@ def startModification(isEncrypting:bool):
         if not checkPass():
             return
     #modification window
+    if isEncrypting:
+        newSize = globalCurrentDirectoryObject.getSize()*1.33333
+        change = f"Estimated folder size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
+    else:
+        newSize = globalCurrentDirectoryObject.getSize()*0.75
+        change = f"Estimated folder size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
+    sizeChange = newSize - globalCurrentDirectoryObject.getSize()
+    if sizeChange > 0:
+        if sizeChange*1.1 > drive.driveCapacity(globalCurrentDirectoryObject.path)['free']:
+            messagebox.showerror("Insufficient space.", f"More space required for encryption. {change}")
+            return
     modWindow = tk.Toplevel(root)
     centerWindow(modWindow, 500, 150)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
-    if isEncrypting:
-        change = f"Estimated size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*1.33333)}"
-    else:
-        change = f"Estimated size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(globalCurrentDirectoryObject.getSize()*0.75)}"
     textFrame = tk.Frame(modWindow, width=500, height=90);
     textBox = tk.Label(textFrame, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12), justify="left")
     textBox.pack(side='left')

@@ -30,12 +30,17 @@ def generateKey(seed:str):
     return base64.urlsafe_b64encode(kdf.derive(seed_bytes))
 
 #generates a hash from a seed using sha256 algorithm
-def sha256(seed:str)->str:
-    return hashlib.sha256(seed.encode()).hexdigest()
+def sha256(seed:str, salt:str="")->str:
+    return hashlib.sha256((salt+seed).encode()).hexdigest()
 
 #generates a hash from a seed using md5 algorithm
-def mdHash(seed:str)->str:
-    return hashlib.md5(seed.encode('utf-8')).hexdigest()
+def md5(seed:str, salt:str="")->str:
+    return hashlib.md5((salt+seed).encode('utf-8')).hexdigest()
+
+arr = Fernet(generateKey("dimas")).encrypt("hello, world".encode())
+print(arr)
+arr = Fernet(generateKey("dimas")).decrypt(arr)
+print(arr)
 
 CHUNKSIZE = 1024*256
 ENCRCHUNKSIZE = 349624

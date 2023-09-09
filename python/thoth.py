@@ -225,11 +225,6 @@ def showStatus(directory):
 
 #show the selected directory again, referring to the textbox instead of the directory finder
 def refreshListBox(e, directory:str):
-    #check if the folder is the C drive itself or directly nested in the C: drive or C:\Users\name.
-    #I assume there are more 'crucial' folders but this should be enough, I put full trust in the user to encrypt responsibly
-    if directory.endswith(':') or directory == os.path.expanduser("~") or len(directory.split('\\')) == 2:
-        if not messagebox.askyesno(f"Significant folder", f"{directory} seems to be a rather significant folder, like a main drive or a primary subfolder from it. Please be careful. Look into it anyway?"):
-            return 'NOTRECCOMMEND'
     if directory == "":
         hideRightFrame()
         return
@@ -346,7 +341,7 @@ def startModification(isEncrypting:bool):
                 if len(newFileName) > MAXFILENAMELENGTH:
                     #if the filename is too long, rename the file.
                     currentFolder = filePath.removesuffix('\\' + oldFileName)
-                    renamedFile = mdHash(os.path.splitext(oldFileName)[0]) + os.path.splitext(oldFileName)[1]
+                    renamedFile = md5(os.path.splitext(oldFileName)[0]) + os.path.splitext(oldFileName)[1]
                     os.rename(currentFolder + '\\' + oldFileName, currentFolder + '\\' + renamedFile)
                     oldFileName = renamedFile
                     newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"

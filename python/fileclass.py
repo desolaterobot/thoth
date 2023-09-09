@@ -192,14 +192,14 @@ class Directory:
                 print(f"Folder {self.name} already contains files encrypted by Thoth. To encrypt, decrypt everything in this folder first.")
                 return 'ALREADYENCRYPTED'
             #!write the md5 hash of the key into the thoth template
-            thothInfo['hash'] = mdHash(key.decode())
+            thothInfo['hash'] = md5(key.decode())
         else:
             #!before we decrypt, check if thoth script exists in the given folder.
             if not os.path.exists(joinAddr(self.path, f"{self.name}.ththscrpt")):
                 print(f"Folder {self.name} has not been encrypted by Thoth. Not decryptable.")
                 return 'UNDECRYPTABLE'
             givenHash = eval(open(joinAddr(self.path, f"{self.name}.ththscrpt"), "r").read())['hash']
-            hashKey = mdHash(key.decode())
+            hashKey = md5(key.decode())
             if hashKey != givenHash:
                 print(f"Wrong key given for folder {self.name}")
                 return 'WRONGKEY'

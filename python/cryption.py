@@ -10,9 +10,53 @@ import hashlib
 import tkinter as tk
 from tkinter import ttk
 from math import ceil
+import string
 
 globalCurrentFileBeingModified = ""
+charList = string.digits + string.ascii_letters + "()_-"
+d = {}
+for index, char in enumerate(charList):
+    d[str(char)] = index
+charMap = d
+charNum = len(charList)
 
+#filename-safe ceasar cipher
+class Caesar():
+    def __init__(self, key:bytes):
+        self.key = sha256(key.decode(), 'mmm... more salt! yum :>').encode()
+    
+    def encrypt(self, content:str):
+        global charNum
+        global charList
+        global charMap
+        result = ""
+        x = 0
+        for char in content:
+            if char == ' ':
+                char = '_'
+            if str(char) in charList:
+                newchar = charList[(charMap[str(char)] + self.key[x % 64]) % charNum]
+                result += newchar
+            else:
+                result += str(char)
+            x += 1
+        return result
+    
+    def decrypt(self, content:str):
+        global charNum
+        global charList
+        global charMap
+        result = ""
+        x = 0
+        for char in content:
+            if str(char) in charList:
+                newchar = charList[(charMap[char] - self.key[x % 64]) % charNum]
+                result += newchar
+            else:
+                result += str(char)
+            x += 1
+        return result
+    
 class EncryptionException(Exception):
     def __init__(self, message):
         self.message = message
@@ -36,11 +80,6 @@ def sha256(seed:str, salt:str="")->str:
 #generates a hash from a seed using md5 algorithm
 def md5(seed:str, salt:str="")->str:
     return hashlib.md5((salt+seed).encode('utf-8')).hexdigest()
-
-arr = Fernet(generateKey("dimas")).encrypt("hello, world".encode())
-print(arr)
-arr = Fernet(generateKey("dimas")).decrypt(arr)
-print(arr)
 
 CHUNKSIZE = 1024*256
 ENCRCHUNKSIZE = 349624

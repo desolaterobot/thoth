@@ -20,7 +20,7 @@ prevTimeString = ""
 numberOfChunks = 0
 chunkTime1 = 0
 chunkTime2 = 0
-globalVersionNumber = '1.3'
+globalVersionNumber = '1.4'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
@@ -335,6 +335,7 @@ def startModification(isEncrypting:bool):
             if destinationFolder == None:
                 destinationFolder = filePath.removesuffix('\\' + oldFileName)
 
+            #if you prefer to use Fernet instead of Ceasar, replace 'Ceasar' to 'Fernet' from here until 'print(f"error decrypting {filePath}")'
             if isEncrypting:
                 name = Fernet(key).encrypt(oldFileName.encode()).decode()
                 newFileName = name + ".thth"
@@ -556,7 +557,7 @@ def renameCurrentFile():
 
 def openFileExplorer():
     if not globalCurrentDirectoryObject == None:
-        filedialog.askopenfilename(initialdir=globalCurrentDirectoryObject.path)
+        os.system(f'start "" "{globalCurrentDirectoryObject.path}"')
 
 def openSettings():
     def saveSettings():
@@ -624,7 +625,6 @@ def openSettings():
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
     # image
-    print(thothDirectory)
     imgPath = joinAddr(thothDirectory, "\\assets\\icon.png")
     try:
         img = Image.open(imgPath).resize((100,100))
@@ -634,7 +634,7 @@ def openSettings():
         image_label.pack(pady=10)
     except:
         pass
-    label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber} - Made by Dimas Rizky', font=('Microsoft Sans Serif', 10), bg=normalSideCol, fg=textColor)
+    label0 = tk.Label(settingsWindow, text=f'ThothCrypt {globalVersionNumber}', font=('Microsoft Sans Serif', 13), bg=normalSideCol, fg=textColor)
     label0.pack()
     #forbidden file extensions
     label1 = tk.Label(settingsWindow, text='Forbidden file extensions', font=('Microsoft Sans Serif', 14), bg=normalSideCol, fg=textColor)
@@ -792,12 +792,33 @@ def rightClick(event):
     name = globalTitlePathDict[selected].split(sep='\\')[-1]
     messagebox.showinfo(f"{name}: Full Path", f"{globalTitlePathDict[selected]}")
 
+def savePasswordToDesktop():
+    passw = passBox.get()
+    if passw == "":
+        messagebox.showerror('Empty password', 'No password entered, nothing to save.')
+        return
+    global globalCurrentDirectoryObject
+    num = 1
+    while os.path.exists(joinAddr(os.path.expanduser("~/Desktop"), f"{globalCurrentDirectoryObject.name}{num}.txt")):
+        num+=1
+    open(joinAddr(os.path.expanduser("~/Desktop"), f"{globalCurrentDirectoryObject.name}{num}.txt"), 'w').write(passw)
+    messagebox.showinfo('Password saved!', f"Passcode saved on your desktop: {globalCurrentDirectoryObject.name}{num}.txt\nHide it before someone finds it!")
+
+def getPasswordFile():
+    file = filedialog.askopenfile(title='choose a .txt file that includes the passcode.', filetypes=[("Text files", "*.txt")])
+    if file:
+        passw = str(file.read())
+    else:
+        return
+    file.close()
+    passBox.insert(0, passw)
+
 # GUI #######################################################################################################################################
 
 root = tk.Tk()
 root.title(f"ThothCrypt {globalVersionNumber}")
 root.resizable(False, False)
-centerWindow(root, 1045, 675)
+centerWindow(root, 1045, 730)
 
 normalListCol = '#001e21'
 normalBGCol = '#003d45'
@@ -829,7 +850,7 @@ findDirectoryButton = tk.Button(buttonLF, text='Search for folder...', font=('Mi
 findDirectoryButton.grid(column=0, row=0, padx=5)
 refreshButton = tk.Button(buttonLF, text='Refresh', font=('Microsoft Sans Serif', 13), command=lambda: refreshListBox(None, dirBox.get()))
 refreshButton.grid(column=1, row=0, padx=5)
-openFolderButton = tk.Button(buttonLF, text='Open', font=('Microsoft Sans Serif', 13), command=openFileExplorer)
+openFolderButton = tk.Button(buttonLF, text='Show in File Explorer', font=('Microsoft Sans Serif', 13), command=openFileExplorer)
 openFolderButton.grid(column=2, row=0, padx=5)
 settingsButton = tk.Button(buttonLF, text='Settings', font=('Microsoft Sans Serif', 13), command=openSettings)
 settingsButton.grid(column=3, row=0, padx=5)
@@ -840,6 +861,14 @@ passcodeLabel.pack()
 
 passBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=40, show='●')
 passBox.pack(padx=5, pady=5)
+
+passButtons = tk.Frame(leftFrame, bg=normalBGCol)
+saveToDesktopButton = tk.Button(passButtons, text='Save to desktop', font=('Microsoft Sans Serif', 13), command=savePasswordToDesktop)
+saveToDesktopButton.grid(column=0, row=0, padx=5)
+getPassword = tk.Button(passButtons, text='Find passcode file', font=('Microsoft Sans Serif', 13), command=getPasswordFile)
+getPassword.grid(column=1, row=0, padx=5)
+passButtons.pack(padx=10, pady=10)
+
 #scrollable listbox
 scrollbar = tk.Scrollbar(root, orient=tk.VERTICAL, width=20)
 horizontalScrollBar = tk.Scrollbar(leftFrame, orient=tk.HORIZONTAL)
@@ -859,7 +888,7 @@ dirlistbox.bind('<<ListboxSelect>>', fileSelected)
 dirlistbox.bind('<Double-Button-1>', startFile)
 dirlistbox.bind("<Button-3>", rightClick)
 
-statusLabel = tk.Label(leftFrame, text='No Folder Displayed.', font=('Microsoft Sans Serif', 13), bg=normalBGCol, fg=textColor)
+statusLabel = tk.Label(leftFrame, text=f"No file selected.", font=('Microsoft Sans Serif', 13), bg=normalBGCol, fg=textColor)
 statusLabel.pack(pady=(0, 0))
 statusLabel2 = tk.Label(leftFrame, text='', font=('Microsoft Sans Serif', 13), bg=normalBGCol, fg=textColor, width=75)
 statusLabel2.pack(pady=(0, 10), expand=False)
@@ -895,6 +924,7 @@ leftFrame.grid(column=0, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
 scrollbar.grid(column=1, row=0, sticky=tk.N+tk.S+tk.E+tk.W)
 
 if saveload.getData("enableAutoRefresh", False):
-    refreshListBox(None, dirBox.get())
+    if os.path.exists(dirBox.get()):
+        refreshListBox(None, dirBox.get())
 
 root.mainloop()

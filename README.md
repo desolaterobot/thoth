@@ -131,6 +131,9 @@ After changing the code, compile it by clicking on `compile.bat`. This updates t
 After compilation is done, you can delete the python files, to remove the evidence of what you have changed. Don't delete anything else.
 
 ## What's New
+### Update 1.4
+- New passcode-related functions: `Save to desktop` allows whatever you have typed in the passcode box to be saved in the desktop.
+- `Find passcode file` allows you to manually take any .txt file and automatically place its contents into the passcode box: in other words, a faster way of entering your passcode!
 ### Update 1.3
 - Folder restructuring changes
 - Added a button in the settings section that adds a ThothCrypt shortcut to the desktop.

@@ -15,10 +15,6 @@ def driveCapacity(fullpath:str):
     print("invalid path.")
     return None
 
-drive_info = driveCapacity("C:\\CODE\\python")
-
-print(drive_info)
-
 """ if drive_info:
     print(f"Drive {drive_info['drive']} - Total Capacity: {drive_info['total'] / (1024 ** 3):.2f} GB")
     print(f"Used Capacity: {drive_info['used'] / (1024 ** 3):.2f} GB")

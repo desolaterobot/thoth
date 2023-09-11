@@ -64,8 +64,6 @@ class Directory:
         totalFileCount = 0
         totalDirCount = 0
 
-        print(f"checking permission: {self.path}")
-
         try:
             for item in os.listdir(self.path):
                 fileAddr = joinAddr(self.path, item)

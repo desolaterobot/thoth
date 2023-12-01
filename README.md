@@ -13,11 +13,12 @@
 This project is currently in active development, and I am still seeking out bugs. ThothCrypt is a dangerous tool if mishandled. I am not resposible for any loss of data, and hence I am reminding the reader to practice safe file management. Please at least read [Getting Started](#getting-started) before you start using this program. Do not forget important passcodes and know your folder locations!
 
 ### 1. [Getting Started](#getting-started)
-### 2. [What's New](#whats-new)
-### 3. [Common Errors](#common-errors)
-### 4. [Downsides to Encryption](#encryption-caveats)
-### 5. [More Features](#more-features)
-### 6. [How It Works](#how-it-works)
+### 2. [Current Bugs](#current-bugs)
+### 3. [What's New](#whats-new)
+### 4. [Common Errors](#common-errors)
+### 5. [Downsides to Encryption](#encryption-caveats)
+### 6. [More Features](#more-features)
+### 7. [How It Works](#how-it-works)
 
 ## Getting Started
 
@@ -129,6 +130,9 @@ Salting is the process of adding additional characters in front of an input befo
 After changing the code, compile it by clicking on `compile.bat`. This updates the `thoth.exe` file with the changes you have made. Compilation takes a while, so please wait for it to finish.
 
 After compilation is done, you can delete the python files, to remove the evidence of what you have changed. Don't delete anything else.
+
+## Current Bugs
+- There are issues with crashing while encrypting files within a .git folder, due to limited permission. For safety, remove .git folders before encrypting.
 
 ## What's New
 ### Update 1.4

@@ -7,11 +7,15 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import PhotoImage
+import cryptography.fernet
+from filehashing import hash_files
 import time
 import string
 import random
 import shortcuts
 import drive
+from io import BytesIO
+from icon import image_strg, ico_icon
 
 # GLOBAL VARIABLES ######################################################################################
 
@@ -20,7 +24,7 @@ prevTimeString = ""
 numberOfChunks = 0
 chunkTime1 = 0
 chunkTime2 = 0
-globalVersionNumber = '1.4'
+globalVersionNumber = '1.5'
 globalTitlePathDict = dict()
 globalCurrentlySelectedPath:str = None
 globalCurrentDirectoryObject:Directory = None
@@ -43,7 +47,7 @@ def intToTimeString(seconds):
 #includes the 'wrong passcode' message window if passcode is false.
 def checkPass():
     #!check if the given key is correct by checking if the md5 hash of the given key matches the hash in thoth script.
-    givenHash = eval(open(joinAddr(globalCurrentDirectoryObject.path, f"{globalCurrentDirectoryObject.name}.ththscrpt"), "r").read())['hash']
+    givenHash = globalCurrentDirectoryObject.encryptionHash
     key = generateKey(passBox.get())
     hashKey = sha256(key.decode())
     if hashKey != givenHash:
@@ -69,7 +73,7 @@ def translateListBox():
             if isFile(path):
                 encryptedFileName = os.path.splitext(path)[0].split(sep='\\')[-1]
                 try:
-                    decryptedFileName = Fernet(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
+                    decryptedFileName = Cipher(generateKey(passBox.get())).decrypt(encryptedFileName.encode()).decode() #contains the original extension
                 except:
                     messagebox.showerror('Folder contains some unencrypted files.', 'We can only translate FULLY encrypted folders. Look into the folder that contains unencrypted files and encrypt them first.')
                     return
@@ -100,6 +104,8 @@ def centerWindow(window, width, height):
     window.geometry(f"{width}x{height}+{x}+{y}")
     try:
         window.iconbitmap(joinAddr(thothDirectory, "\\assets\\icon.ico"))
+        #image = tk.PhotoImage(data=base64.b64decode(ico_icon))
+        #root.iconphoto(True, image)
     except:
         pass
 
@@ -166,7 +172,7 @@ def showDirectory(e, directory:str, nestvalue:int=0):
             globalTitlePathDict[title] = item.path
         elif isinstance(item, Directory):
             dirCount += 1
-            title = f"{nestvalue * '    '}FOLDER {dirCount}/{targetDirectory.totalDirCount}: {item.name} - contains {item.totalFileCount} files, {item.totalDirCount} folders:" 
+            title = f"{nestvalue * '    '}FOLDER {dirCount}/{targetDirectory.totalDirCount}: {item.name} {('(' + item.encryptionMethod + ')') if item.encryptionMethod else ''} - contains {item.totalFileCount} files, {item.totalDirCount} folders:" 
             appendListBox(dirlistbox, title)
             globalTitlePathDict[title] = item.path
             showDirectory(None, item.path, nestvalue + 1)
@@ -273,20 +279,140 @@ def lookInFolder():
     dirBox.insert(0, globalCurrentlySelectedPath)
     refreshListBox(None, globalCurrentlySelectedPath)
 
+#! JUST MOVED OUTSIDE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def modifyByChunk(
+        filePath:str, 
+        key:bytes,
+
+        textBox:ttk.Label = None, # Label object for the label at the bottom of the window.
+        progressBar:ttk.Progressbar = None, # Progressbar to be updated every iteration of chunk encryption
+        piece:float = None, # Piece of progressbar to be added every successful chunk encryption
+        encryptionProgress:int = None, # current value of encryption progress to be displayed in the window,
+        totalFileNum:int = None, # Total files in directory
+        makeCopy:bool = False,
+        destinationFolder:str = None,
+        chunkSize:int = CHUNKSIZE
+    ):
+    
+    #recording how much time is taken for a certain number of chunks is encrypted.
+    def checkChunks(sample):
+        global chunkTime1
+        global chunkTime2
+        global numberOfChunks
+        #print(chunkTime1, chunkTime2, numberOfChunks)
+        if numberOfChunks == 0:
+            chunkTime1 = time.time()
+        elif numberOfChunks >= sample:
+            numberOfChunks = -1
+            chunkTime2 = time.time()
+            timeTakenFor5Chunks = chunkTime2 - chunkTime1 
+            global currentDirectorySize
+            totalTimeTaken = (timeTakenFor5Chunks/(sample*256*1024))*(currentDirectorySize)
+            return intToTimeString(totalTimeTaken)
+        return ""
+
+    #print(f'start modification function {filePath}')
+    currentFileEncryptionProgress = 0
+    #currentFileEncryptionTotal = numberOfChunks(filePath)
+    isEncrypting = not filePath.endswith('.thth')
+    oldFileName = filePath.split(sep='\\')[-1]
+    #if destinationFolder is not set to anything, make it the original folder.
+    if destinationFolder == None:
+        destinationFolder = filePath.removesuffix('\\' + oldFileName)
+    cipher = Cipher(key)
+    if isEncrypting:
+        name = cipher.encrypt(oldFileName.encode()).decode()
+        newFileName = name + ".thth"
+        if len(newFileName) > MAXFILENAMELENGTH:
+            #if the filename is too long, rename the file.
+            currentFolder = filePath.removesuffix('\\' + oldFileName)
+            renamedFile = md5(os.path.splitext(oldFileName)[0]) + os.path.splitext(oldFileName)[1]
+            os.rename(currentFolder + '\\' + oldFileName, currentFolder + '\\' + renamedFile)
+            oldFileName = renamedFile
+            newFileName = cipher.encrypt(oldFileName.encode()).decode() + ".thth"
+            filePath = currentFolder + '\\' + renamedFile
+    else:
+        if oldFileName.endswith(".thth"):
+            newFileName = cipher.decrypt(oldFileName.removesuffix(".thth").encode()).decode()
+        else:
+            print(f"error decrypting {filePath}")
+
+    #forming new destination path
+    newFilePath = destinationFolder + "\\" + newFileName
+
+    #open both files, then start transferring data from old file to new file, encrypting/decrypting data in the process
+
+    with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
+        while True:
+            if isEncrypting:
+                chunk = oldFile.read(chunkSize) 
+                if not chunk:
+                    break
+                else:
+                    if USEXOR:
+                        modified = cipher.encrypt_XOR(chunk)
+                    else:
+                        modified = cipher.encrypt(chunk)
+                    newFile.write(modified)
+            else:
+                chunk = oldFile.read(chunkSize if USEXOR else 349624)
+                if not chunk:
+                    break
+                else:
+                    if USEXOR:
+                        modified = cipher.encrypt_XOR(chunk) #XOR encryption is symmetric
+                    else:
+                        try:
+                            modified = cipher.decrypt(chunk)
+                        except:
+                            raise AES_Error(newFilePath)
+                    newFile.write(modified)
+            currentFileEncryptionProgress += 1
+            global currentDirectorySize
+            if isEncrypting:
+                currentDirectorySize -= CHUNKSIZE
+            else:
+                currentDirectorySize -= ENCRCHUNKSIZE
+            #globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
+            global numberOfChunks
+            global prevTimeString
+            timeString = checkChunks(100)
+            if timeString != "":
+                prevTimeString = timeString
+            message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {round(progressBar['value'], 3)}%\n{encryptionProgress}/{totalFileNum} Files Processed\nEstimated time taken: {prevTimeString}"
+            numberOfChunks += 1
+            if textBox:
+                textBox.config(text=message)
+            progressBar['value'] += piece
+            root.update()
+            
+    #now that all our data is in the new file, delete the old file.
+    if not makeCopy:
+        try:
+            os.remove(filePath)
+        except:
+            messagebox.showwarning(title="Unable to remove file.", message=f"Permission denied error: unable to remove file: {filePath}")
+            pass
+    return newFilePath
+
 #binded to the button that says "Encrypt folder"
 #the folder encryption function here is non-recursive, unlike the object method modifyDirectory()
 def startModification(isEncrypting:bool):
+    global globalCurrentDirectoryObject
+    global USEXOR
+
     def start():
         global globalCurrentDirectoryObject
         modWindow.title(f"{'Encrypting' if isEncrypting else 'Decrypting'} files... DO NOT CLOSE UNTIL COMPLETION.")
         encryptButton.pack_forget()
+        encryptXORButton.pack_forget()
         textBox.config(text='\nModification cannot start for some reason. Refresh and try again.')
         #encryption steps: modification, update current directory, update the list box.
         key = generateKey(passBox.get())
         currentDirectory = globalCurrentDirectoryObject.path
 
         #*BEFORE FOLDER MODIFICATION, MAKE SOME CHECKS////////////////////////////////////////////////////////////////////////////////////////////////
-            
+        
         #get list of folders and subfolders.
         folderList = globalCurrentDirectoryObject.getCompleteFolderPathList()
         thisPath = globalCurrentDirectoryObject.path
@@ -295,115 +421,49 @@ def startModification(isEncrypting:bool):
         encryptionProgress = 0
         chunkNumberFolder = 0
         for file in globalCurrentDirectoryObject.getCompleteFilePathList():
-            chunkNumberFolder += ceil(os.path.getsize(file) / (CHUNKSIZE if isEncrypting else 349624))
+            chunkNumberFolder += ceil(os.path.getsize(file) / (CHUNKSIZE if isEncrypting else (349624 if not USEXOR else CHUNKSIZE)))
         piece = (100/chunkNumberFolder)
-        thothInfo = {
-            "hash" : None
-        }
-        thothInfo['hash'] = sha256(key.decode())
-
         progressBar = ttk.Progressbar(modWindow, orient='horizontal', length=460, mode='determinate')
         progressBar.pack(padx=5, pady=(8, 8))
         
         disableWidgets((dirlistbox, dirBox, lookInFolderButton, renameButton, deleteFileButton, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton, removeFileButton))
         global currentDirectorySize
         currentDirectorySize = globalCurrentDirectoryObject.getSize()
-        #recording how much time is taken for a certain number of chunks is encrypted.
-        def checkChunks(sample):
-            global chunkTime1
-            global chunkTime2
-            global numberOfChunks
-            #print(chunkTime1, chunkTime2, numberOfChunks)
-            if numberOfChunks == 0:
-                chunkTime1 = time.time()
-            elif numberOfChunks >= sample:
-                numberOfChunks = -1
-                chunkTime2 = time.time()
-                timeTakenFor5Chunks = chunkTime2 - chunkTime1 
-                global currentDirectorySize
-                totalTimeTaken = (timeTakenFor5Chunks/(sample*256*1024))*(currentDirectorySize)
-                return intToTimeString(totalTimeTaken)
-            return ""
 
-        def modifyByChunk(filePath:str, key:bytes, destinationFolder:str = None, chunkSize:int = CHUNKSIZE):
-            #print(f'start modification function {filePath}')
-            currentFileEncryptionProgress = 0
-            #currentFileEncryptionTotal = numberOfChunks(filePath)
-            isEncrypting = not filePath.endswith('.thth')
-            oldFileName = filePath.split(sep='\\')[-1]
-            #if destinationFolder is not set to anything, make it the original folder.
-            if destinationFolder == None:
-                destinationFolder = filePath.removesuffix('\\' + oldFileName)
-
-            #if you prefer to use Fernet instead of Ceasar, replace 'Ceasar' to 'Fernet' from here until 'print(f"error decrypting {filePath}")'
-            if isEncrypting:
-                name = Fernet(key).encrypt(oldFileName.encode()).decode()
-                newFileName = name + ".thth"
-                if len(newFileName) > MAXFILENAMELENGTH:
-                    #if the filename is too long, rename the file.
-                    currentFolder = filePath.removesuffix('\\' + oldFileName)
-                    renamedFile = md5(os.path.splitext(oldFileName)[0]) + os.path.splitext(oldFileName)[1]
-                    os.rename(currentFolder + '\\' + oldFileName, currentFolder + '\\' + renamedFile)
-                    oldFileName = renamedFile
-                    newFileName = Fernet(key).encrypt(oldFileName.encode()).decode() + ".thth"
-                    filePath = currentFolder + '\\' + renamedFile
-            else:
-                if oldFileName.endswith(".thth"):
-                    newFileName = Fernet(key).decrypt(oldFileName.removesuffix(".thth").encode()).decode()
-                else:
-                    print(f"error decrypting {filePath}")
-
-
-            #forming new destination path
-            newFilePath = destinationFolder + "\\" + newFileName
-
-            #open both files, then start transferring data from old file to new file, encrypting data in the process
-            with open(filePath, 'rb') as oldFile, open(newFilePath, 'ab') as newFile:
-                while True:
-                    if isEncrypting:
-                        chunk = oldFile.read(chunkSize) 
-                        if not chunk:
-                            break
-                        else:
-                            modified = Fernet(key).encrypt(chunk)
-                            newFile.write(modified)
-                    else:
-                        chunk = oldFile.read(349624)
-                        if not chunk:
-                            break
-                        else:
-                            modified = Fernet(key).decrypt(chunk)
-                            newFile.write(modified)
-                    currentFileEncryptionProgress += 1
-                    global currentDirectorySize
-                    if isEncrypting:
-                        currentDirectorySize -= CHUNKSIZE
-                    else:
-                        currentDirectorySize -= ENCRCHUNKSIZE
-                    #globalCurrentEncryptionPercentage = round(currentFileEncryptionProgress/currentFileEncryptionTotal * 100, 1)
-                    global numberOfChunks
-                    global prevTimeString
-                    timeString = checkChunks(100)
-                    if timeString != "":
-                        prevTimeString = timeString
-                    message = f"{'Encrypting' if isEncrypting else 'Decrypting'} file: {oldFileName if isEncrypting else newFileName}\nSize: {sizeToString(os.path.getsize(filePath))} Progress: {round(progressBar['value'], 3)}%\n{encryptionProgress}/{totalFileNum} Files Encrypted\nEstimated time taken: {prevTimeString}"
-                    numberOfChunks += 1
-                    textBox.config(text=message)
-                    progressBar['value'] += piece
-                    root.update()
-                    
-            #now that all our data is in the new file, delete the old file.
-            os.remove(filePath)
-            return newFilePath
+        if isEncrypting:
+            #!before encryption... we save the data into a .ththscrpt file in each subfolder, to signify an encryption by Thoth
+            #!This is done just in case encryption fails
+            thothInfo = {
+                "method" : "XOR" if USEXOR else "AES",
+                "hash" : sha256(key.decode())
+            }
+            for folderPath in folderList:
+                textBox.config(text=f"Placing folder data...\n{folderPath}")
+                name = folderPath.split(sep='\\')[-1]
+                open(joinAddr(folderPath, f"{name}.ththscrpt"), "w").write(str(thothInfo))
+                progressBar['value'] += piece
+                root.update()
 
         startTime = time.time() #*START OF MODIFICATION PROCESS ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////``
         failures = []
+        
         for filePath in fileList:
-            e = modifyByChunk(filePath, key)
-            if isinstance(e, Exception):
-                failures.append(filePath)
+            try:
+                modifyByChunk(filePath, key, textBox, progressBar, piece, encryptionProgress, totalFileNum)
+            except AES_Error as ex:
+                newFullPath = ex.message
+                newFileName = os.path.split(newFullPath)[-1]
+                print("ORIGINAL FILENAME: " + newFileName)
+                failures.append(newFullPath)
             encryptionProgress += 1
             root.update()
+
+        # take care of any failures
+        if len(failures) > 0:
+            for failure in failures:
+                os.remove(failure)
+            messagebox.showerror("MODIFIED CIPHERTEXT!", f"The ciphertext for {str([os.path.split(failure)[-1] for failure in failures])} may have been modified somehow, making it impossible to decrypt. Please find a backup of these files somewhere else. The corrupted encrypted file will be left in this folder, for you to remove as you please.")
+            
         global prevTimeString
         prevTimeString = ""
         endTime = time.time() #*END OF MODIFICATION PROCESS //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,15 +472,7 @@ def startModification(isEncrypting:bool):
         root.update()
         piece = (100 / len(folderList))
 
-        if isEncrypting:
-            #!after encryption... we save the data into a .ththscrpt file in each subfolder, to signify an encryption by Thoth
-            for folderPath in folderList:
-                textBox.config(text=f"Placing folder data...\n{folderPath}")
-                name = folderPath.split(sep='\\')[-1]
-                open(joinAddr(folderPath, f"{name}.ththscrpt"), "w").write(str(thothInfo))
-                progressBar['value'] += piece
-                root.update()
-        else:
+        if not isEncrypting:
             #!after decryption... we remove the .ththscrpt file entirely in each subfolder, to show that the folder is normal.
             for folderPath in folderList:
                 textBox.config(text=f"Removing folder data...\n{folderPath}")
@@ -439,13 +491,21 @@ def startModification(isEncrypting:bool):
         enableWidgets((dirlistbox, dirBox, findDirectoryButton, refreshButton, settingsButton, openFolderButton, parentFolderButton, translateFolderButton, decryptFolderButton, encryptFolderButton, addFilesButton))
         refreshListBox(None, currentDirectory) #update listbox
         statusLabel2.config(text=f"{'Encrypted' if isEncrypting else 'Decrypted'} target directory in {intToTimeString(endTime-startTime)}. {len(failures)} failures.", fg='white')
-        if failures:
-            failureList = ""
-            for file in failures:
-                failureList = failureList + '\n' + file
-            messagebox.showwarning('Some files failed to be modified', f'Please check on the state of these files:\n{failureList}')
         modWindow.destroy()
-    global globalCurrentDirectoryObject
+    
+    def AESstart():
+        global USEXOR
+        if isEncrypting:
+            USEXOR = False
+        else:
+            USEXOR = True if globalCurrentDirectoryObject.encryptionMethod == 'XOR' else False
+        start()
+
+    def XORstart():
+        global USEXOR
+        USEXOR = True
+        start()
+    
     #check if the folder is COMPLETELY encrypted or unencrypted.
     #getting the complete list of filepaths.
     try:
@@ -465,35 +525,45 @@ def startModification(isEncrypting:bool):
             if file.endswith('.thth'):
                 messagebox.showerror('Folder is not fully decrypted.', f'Encrypted files are found at {folder}. Please look into this folder and delete or decrypt these files first.')
                 return
-            
+
     if passBox.get() == "":
         messagebox.showerror(title='No passcode entered', message=f"Please enter a passcode before you {'encrypt' if isEncrypting else 'decrypt'}.")
         return 
     if not isEncrypting:
         if not checkPass():
             return
+        
     #modification window
     if isEncrypting:
         newSize = globalCurrentDirectoryObject.getSize()*1.33333
-        change = f"Estimated folder size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
+        change = f"Estimated AES size increase: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
     else:
         newSize = globalCurrentDirectoryObject.getSize()*0.75
-        change = f"Estimated folder size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
+        change = f"Estimated AES size decrease: {sizeToString(globalCurrentDirectoryObject.getSize())} -> {sizeToString(newSize)}"
     sizeChange = newSize - globalCurrentDirectoryObject.getSize()
+
+    # drive space checking function is not tested at all btw
     if sizeChange > 0:
         if sizeChange*1.1 > drive.driveCapacity(globalCurrentDirectoryObject.path)['free']:
             messagebox.showerror("Insufficient space.", f"More space required for encryption. {change}")
             return
+
     modWindow = tk.Toplevel(root)
-    centerWindow(modWindow, 500, 150)
+    centerWindow(modWindow, 500, 180)
     modWindow.title(f"Confirm {'Encryption' if isEncrypting else 'Decryption'}")
     textFrame = tk.Frame(modWindow, width=500, height=90);
     textBox = tk.Label(textFrame, text=f"You are about to {'encrypt' if isEncrypting else 'decrypt'}\nthe target folder with the given passcode. Proceed?\n{change}", font=('Microsoft Sans Serif', 12), justify="left")
     textBox.pack(side='left')
     textFrame.pack(padx=15, pady=(5, 0))
     textFrame.pack_propagate(False)
-    encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'}", font=('Arial', 13), command=start)
-    encryptButton.pack(padx=5, pady=(5, 2))
+    encryptButton = tk.Button(modWindow, text=f"Start {'Encryption' if isEncrypting else 'Decryption'} with {'XOR' if globalCurrentDirectoryObject.encryptionMethod == 'XOR' else 'AES'}", font=('Arial', 13), command=AESstart)
+    encryptButton.pack(padx=5, pady=(0, 2))
+    encryptXORButton = tk.Button(modWindow, text=f"Start Encryption with XOR", font=('Arial', 13), command=XORstart)
+    
+    #!newly added
+    if isEncrypting:
+        encryptXORButton.pack(padx=5, pady=(5, 2))
+    
     encryptButton.focus()
 
 #such a tedious function for something that is not really related to encryption
@@ -507,7 +577,7 @@ def renameCurrentFile():
         newNameAndExtension = newName + extension
         newName2 = newNameAndExtension
         if globalIsTranslatedBoolean: #! before renaming the encrypted file, we must first encrypt the new name.
-            newNameAndExtension = Fernet(encryptionKey).encrypt(newNameAndExtension.encode()).decode() + '.thth'
+            newNameAndExtension = Cipher(encryptionKey).encrypt(newNameAndExtension.encode()).decode() + '.thth'
         newPath = globalCurrentlySelectedPath.replace(name, newNameAndExtension)
         renameWindow.destroy()
         os.rename(globalCurrentlySelectedPath, newPath) #renaming the file itself.
@@ -518,7 +588,7 @@ def renameCurrentFile():
             return
         itemSelected:str = dirlistbox.get(selected[0])
         if globalIsTranslatedBoolean: #! before changing the listbox content, if we are in translated mode, translate the file first before changing.
-            newText = itemSelected.replace(Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode(), newName2)
+            newText = itemSelected.replace(Cipher(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode(), newName2)
         else:
             newText = itemSelected.replace(name, newNameAndExtension)
         dirlistbox.delete(selected[0])
@@ -540,12 +610,12 @@ def renameCurrentFile():
         return
     extension = os.path.splitext(name)[1] #gets the file extension from the pure filename
     if globalIsTranslatedBoolean: #! if file is encrypted, to get the extension, remove the .thth suffix first, decrypt the name, then get extension.
-        extension = os.path.splitext(Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode())[1] #getting the extension if name is encrypted
+        extension = os.path.splitext(Cipher(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode())[1] #getting the extension if name is encrypted
     #creating the toplevel window
     renameWindow = tk.Toplevel(root)
     centerWindow(renameWindow, 300, 120)
     renameWindow.title("Rename file/folder")
-    label = tk.Label(renameWindow, text=f"Enter the new name for {name if not globalIsTranslatedBoolean else Fernet(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode()}.\nFile extension added automatically.")
+    label = tk.Label(renameWindow, text=f"Enter the new name for {name if not globalIsTranslatedBoolean else Cipher(encryptionKey).decrypt(name.removesuffix('.thth').encode()).decode()}.\nFile extension added automatically.")
     label.pack(pady=5, padx=10)
     nameEntry = tk.Entry(renameWindow, width=40, bg='#bababa')
     nameEntry.pack(pady=5, padx=10)
@@ -625,9 +695,8 @@ def openSettings():
     settingsWindow.focus_force()
     settingsWindow.config(bg=normalSideCol)
     # image
-    imgPath = joinAddr(thothDirectory, "\\assets\\icon.png")
     try:
-        img = Image.open(imgPath).resize((100,100))
+        img = Image.open(BytesIO(base64.b64decode(image_strg))).resize((100,100))
         photo = ImageTk.PhotoImage(img)
         image_label = tk.Label(settingsWindow, image=photo, bg=normalSideCol)
         image_label.image = photo
@@ -643,7 +712,7 @@ def openSettings():
     label2.pack(pady=(0,2))
     startingEntry = ""
     for item in saveload.getData('forbidden'):
-        if item == '.ththscrpt':
+        if item in ['.ththscrpt', '.ththconfig']:
             continue
         startingEntry = startingEntry + item + ','
     extensionsBox = tk.Entry(settingsWindow, font=('Microsoft Sans Serif', 13), width=40)
@@ -672,6 +741,9 @@ def openSettings():
     shortButton.pack(pady=(5,5))
 
 def addFilesIntoEncryptedFolder():
+    global USEXOR
+    USEXOR = True if globalCurrentDirectoryObject.encryptionMethod == 'XOR' else False
+
     if not checkPass():
         return
     if not messagebox.askokcancel('Encrypt and add files', 'In the following window, select the files you want to encrypt and add into the target folder.'):
@@ -688,31 +760,42 @@ def addFilesIntoEncryptedFolder():
     for file in fileList:
         filename = file.split(sep="\\")[-1]
         label.config(text=f'Encrypting\n{filename}\n({filecount}/{len(fileList)})')
-        modifyByChunk(file, key, globalCurrentDirectoryObject.path, progressBar=bar, root=root)
+        numberOfChunks = ceil(os.path.getsize(file) / CHUNKSIZE)
+        piece = (100/numberOfChunks)
+        modifyByChunk(file, key, piece=piece, destinationFolder=globalCurrentDirectoryObject.path, progressBar=bar)
         bar['value'] = 0
         filecount+=1
     window.destroy()
     refreshListBox(None, globalCurrentDirectoryObject.path)
 
 def removeFileFromEncryptedFolder():
+    global USEXOR
+    USEXOR = True if globalCurrentDirectoryObject.encryptionMethod == 'XOR' else False
+
     if not checkPass():
         return
     filename = globalCurrentlySelectedPath.split(sep="\\")[-1]
     key = generateKey(passBox.get())
-    if not messagebox.askokcancel("Decrypt and move to desktop...", f"This function decrypts {Fernet(key).decrypt(filename.removesuffix('.thth').encode()).decode()} only and moves it to a folder in the desktop."):
+    if not messagebox.askokcancel("Decrypt and move to folder...", f"This function decrypts {Cipher(key).decrypt(filename.removesuffix('.thth').encode()).decode()} only and moves it to a folder of your choice."):
         return
-    destinationFolder = joinAddr(os.path.expanduser("~\\Desktop"), "fromThoth")
+    chosenFolder = filedialog.askdirectory()
+    if not chosenFolder:
+        return
+    destinationFolder = joinAddr(chosenFolder, "fromThoth")
     try:
         os.makedirs(destinationFolder)
     except:
         pass
-    window, label, bar = progressWindow(f'Encrypting and adding files into {globalCurrentDirectoryObject.name}...')
-    label.config(text=f"Encrypting and moving {filename} to desktop...")
-    window.title("Decrypt to desktop...")
-    modifyByChunk(globalCurrentlySelectedPath, key, destinationFolder, False, label, bar, window)
+    window, label, bar = progressWindow(f'Decrypting and moving files...')
+    label.config(text=f"Decypting and moving {filename} to {chosenFolder}...")
+    window.title("Decrypt to folder...")
+    numberOfChunks = ceil(os.path.getsize(globalCurrentlySelectedPath) / CHUNKSIZE)
+    piece = (100/numberOfChunks)
+    modifyByChunk(globalCurrentlySelectedPath, key, textBox=None, piece=piece, progressBar=bar, makeCopy=False, destinationFolder=destinationFolder)
     selected_indices = dirlistbox.curselection()
     for index in selected_indices:
         dirlistbox.delete(index)
+    refreshListBox(None, dirBox.get())
     window.destroy()
 
 #function runs whenever something is selected from the listbox
@@ -740,13 +823,16 @@ def fileSelected(event):
 def startFile(event):
     global globalCurrentlySelectedPath
     global globalCurrentDirectoryObject
+    global USEXOR
+    USEXOR = True if globalCurrentDirectoryObject.encryptionMethod == 'XOR' else False
+
     path = globalCurrentlySelectedPath
     key = generateKey(passBox.get())
     if globalIsTranslatedBoolean and isFile(path):
         if checkPass():
-            name = Fernet(key).decrypt(path.split(sep='\\')[-1].removesuffix('.thth').encode()).decode()
+            name = Cipher(key).decrypt(path.split(sep='\\')[-1].removesuffix('.thth').encode()).decode()
             window, label, progress = progressWindow(f'Opening {name}...')
-            storedpath = modifyByChunk(path, key, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True, progressBar=progress, label=label, root=root)
+            storedpath = oldModifyByChunk(path, key, USEXOR, destinationFolder=os.path.expanduser("~")+f"\AppData\Local\Thoth", makeCopy=True, progressBar=progress, label=label, root=root)
             window.destroy()
             os.system(f'start "" "{storedpath}"')
             if isinstance(storedpath, Exception): #some error handling i guess
@@ -804,14 +890,14 @@ def savePasswordToDesktop():
     open(joinAddr(os.path.expanduser("~/Desktop"), f"{globalCurrentDirectoryObject.name}{num}.txt"), 'w').write(passw)
     messagebox.showinfo('Password saved!', f"Passcode saved on your desktop: {globalCurrentDirectoryObject.name}{num}.txt\nHide it before someone finds it!")
 
-def getPasswordFile():
-    file = filedialog.askopenfile(title='choose a .txt file that includes the passcode.', filetypes=[("Text files", "*.txt")])
-    if file:
-        passw = str(file.read())
-    else:
+def hashFileContentsAsPassword():
+    filesSelected = filedialog.askopenfilenames()
+    if len(filesSelected) < 1:
+        messagebox.showwarning("No files selected.", "No files are selected to hash and use as password, password box remains empty.")
         return
-    file.close()
-    passBox.insert(0, passw)
+    messagebox.showinfo(f"{len(filesSelected)} files chosen", f"You have chosen the following files to be hashed and used as a password: {str([os.path.split(file)[-1] for file in filesSelected])}")
+    whole_hash = hash_files(filesSelected)
+    passBox.insert(0, whole_hash)
 
 # GUI #######################################################################################################################################
 
@@ -839,6 +925,7 @@ targetLabel.pack(pady=(10,2))
 
 dirBox = tk.Entry(leftFrame, font=('Microsoft Sans Serif', 13), width=70)
 dirBox.bind('<Return>', lambda e: refreshListBox(e, dirBox.get()))
+
 dirBox.pack(padx=5, pady=5)
 if saveload.getData("enableLastVisited"):
     lastVisited = saveload.getData(key="lastVisited")
@@ -865,7 +952,7 @@ passBox.pack(padx=5, pady=5)
 passButtons = tk.Frame(leftFrame, bg=normalBGCol)
 saveToDesktopButton = tk.Button(passButtons, text='Save to desktop', font=('Microsoft Sans Serif', 13), command=savePasswordToDesktop)
 saveToDesktopButton.grid(column=0, row=0, padx=5)
-getPassword = tk.Button(passButtons, text='Find passcode file', font=('Microsoft Sans Serif', 13), command=getPasswordFile)
+getPassword = tk.Button(passButtons, text='Hash files as password', font=('Microsoft Sans Serif', 13), command=hashFileContentsAsPassword)
 getPassword.grid(column=1, row=0, padx=5)
 passButtons.pack(padx=10, pady=10)
 
@@ -913,7 +1000,7 @@ encryptFolderButton.pack(padx=15, pady=(14, 4))
 encrButtonFrame = tk.Frame(rightFrame, bg=encrSideCol)
 translateFolderButton = tk.Button(encrButtonFrame, text='Translate', font=('Microsoft Sans Serif', 13), command=translateListBox)
 translateFolderButton.pack(padx=15, pady=(14, 4))
-addFilesButton = tk.Button(encrButtonFrame, text='Add Files', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
+addFilesButton = tk.Button(encrButtonFrame, text='Encrypt and Add', font=('Microsoft Sans Serif', 13), command=addFilesIntoEncryptedFolder)
 addFilesButton.pack(padx=15, pady=(14, 4))
 removeFileButton = tk.Button(encrButtonFrame, text='Decrypt and Move', font=('Microsoft Sans Serif', 13), state='disabled',command=removeFileFromEncryptedFolder)
 removeFileButton.pack(padx=15, pady=(14, 4))

@@ -50,8 +50,6 @@ class File:
             print(f"Error deleting file: {e}")
     def getSize(self):
         return os.path.getsize(self.path)
-    def modify(self, key:bytes):
-        return modifyByChunk(self.path, key)
 
 rootDirectoryFilePathList = []
 
@@ -60,16 +58,27 @@ class Directory:
         self.name = itemName;
         self.path = joinAddr(parent, itemName)
         self.contents = []
-        self.isEncrypted = False
         totalFileCount = 0
         totalDirCount = 0
+
+        #only applies if the current directory is an encrypted one
+        self.isEncrypted = False
+        self.encryptionMethod = None
+        self.encryptionHash = None
 
         try:
             for item in os.listdir(self.path):
                 fileAddr = joinAddr(self.path, item)
                 #! if folder contains a .ththscrpt file, it is evidence that the folder is encrypted by Thoth.
                 if fileAddr.endswith('.ththscrpt'):
-                    self.isEncrypted = True
+                    with open(fileAddr, "r") as file:
+                        try:
+                            self.isEncrypted = True
+                            thth_contents = eval(file.read())
+                            self.encryptionMethod = thth_contents['method']
+                            self.encryptionHash = thth_contents['hash']
+                        except:
+                            messagebox.showerror('Parsing Error', f'The THTHSCRPT file located in this folder seems to have the wrong configuration.')
                 if fileAddr.endswith('.thth'):
                     self.containsEncryptedFiles = True
                 if not isAllowed(fileAddr):
@@ -83,7 +92,6 @@ class Directory:
                     totalDirCount+=1
         except:
             messagebox.showwarning(f"Error accessing {self.name}", f"{self.path}\nseems to be inaccessible, most likely due to a permission error. This folder will be treated as empty. If you want these files encrypted, move them to another folder.")
-        
         self.totalFileCount = totalFileCount
         self.totalDirCount = totalDirCount
 
@@ -113,6 +121,7 @@ class Directory:
                 return childrenTotal + directory.totalFileCount
         return getCFC(self)
     
+
     #returns a list of the complete paths of every file within a directory, even within the subdirectories.
     def getCompleteFilePathList(self)->list:
         if hasattr(self, 'completeFilePathList'):
